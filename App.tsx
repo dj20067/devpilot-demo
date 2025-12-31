@@ -9,7 +9,7 @@ import TicketGrid from './components/TicketGrid';
 import OutboundCallPanel from './components/OutboundCallPanel';
 import { getMockData } from './constants';
 import { UserRole, Message, Ticket, User } from './types';
-import { Settings, Bell, Globe, X, Archive, Phone, Mic, MicOff, ChevronDown, Check, Shield, AlertTriangle, Info } from 'lucide-react';
+import { Settings, Bell, Globe, X, Archive, Phone, Mic, MicOff, ChevronDown, Check, Shield, AlertTriangle, Info, Menu, ArrowLeft } from 'lucide-react';
 import { I18nProvider, useI18n } from './i18n';
 import { ProfileModal } from './components/ProfileModal';
 
@@ -113,6 +113,11 @@ const DevPilotApp: React.FC = () => {
 
   // View State
   const [activeView, setActiveView] = useState<'chat' | 'my_tickets' | 'all_tickets'>('chat');
+  
+  // Responsive States
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isMobileContextOpen, setIsMobileContextOpen] = useState(false);
+  const [showMobileDetail, setShowMobileDetail] = useState(false); // Controls List vs Detail on mobile
 
   // Chat State
   const [activeSessionId, setActiveSessionId] = useState<string | null>(MOCK_SESSIONS[0].id);
@@ -275,11 +280,29 @@ const DevPilotApp: React.FC = () => {
   const visibleTickets = getVisibleTickets();
   const ticketListTitle = activeView === 'my_tickets' ? t('nav_my_tickets') : t('nav_all_tickets');
 
+  // --- Handlers ---
+  const handleSessionSelect = (sessionId: string) => {
+      setActiveSessionId(sessionId);
+      setShowMobileDetail(true);
+  };
+
   const handleTicketSelect = (ticketId: string) => {
       setActiveTicketId(ticketId);
+      setShowMobileDetail(true);
       if (activeView === 'all_tickets') {
           setIsTicketDrawerOpen(true);
       }
+  };
+
+  const handleBackToMobileList = () => {
+      setShowMobileDetail(false);
+      setIsMobileContextOpen(false);
+  };
+
+  const handleViewChange = (view: 'chat' | 'my_tickets' | 'all_tickets') => {
+      setActiveView(view);
+      setIsMobileNavOpen(false);
+      setShowMobileDetail(false);
   };
 
   const handleSendMessage = (text: string, type: Message['type'] = 'text', metadata: any = {}) => {
@@ -384,19 +407,28 @@ const DevPilotApp: React.FC = () => {
           <SystemToast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />
       )}
 
-      {/* 1. Left Navigation Rail */}
-      <NavRail activeView={activeView} onChangeView={setActiveView} />
+      {/* 1. Navigation (Desktop: Rail, Mobile: Drawer) */}
+      <div className={`fixed inset-0 z-40 bg-black/50 transition-opacity md:hidden ${isMobileNavOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsMobileNavOpen(false)}></div>
+      <div className={`fixed md:relative z-50 h-full transition-transform duration-300 md:translate-x-0 ${isMobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          <NavRail activeView={activeView} onChangeView={handleViewChange} />
+      </div>
 
       {/* 2. Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-full relative">
         
         {/* Top Header */}
-        <div className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6 flex-shrink-0 z-20 shadow-sm relative">
-            <h1 className="text-lg font-bold text-slate-800">
-                {activeView === 'chat' ? t('nav_chat') : ticketListTitle}
-            </h1>
+        <div className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-6 flex-shrink-0 z-20 shadow-sm relative">
+            <div className="flex items-center gap-3">
+                {/* Mobile Menu Toggle */}
+                <button className="md:hidden text-slate-500" onClick={() => setIsMobileNavOpen(true)}>
+                    <Menu size={24} />
+                </button>
+                <h1 className="text-lg font-bold text-slate-800 truncate max-w-[150px] md:max-w-none">
+                    {activeView === 'chat' ? t('nav_chat') : ticketListTitle}
+                </h1>
+            </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 md:gap-4">
                 
                 {/* Outbound Call Trigger */}
                 <button 
@@ -407,7 +439,7 @@ const DevPilotApp: React.FC = () => {
                     <Phone size={16} className={showCallPanel ? 'fill-current' : ''} />
                 </button>
 
-                <div className="h-6 w-px bg-slate-200 mx-1"></div>
+                <div className="h-6 w-px bg-slate-200 mx-1 hidden md:block"></div>
 
                 {/* Combined Status Menu */}
                 <div className="relative">
@@ -416,7 +448,7 @@ const DevPilotApp: React.FC = () => {
                         className="flex items-center gap-2 pl-2 pr-1 py-1.5 rounded-full border border-slate-200 hover:bg-slate-50 transition-colors bg-white shadow-sm"
                     >
                         <span className={`w-2.5 h-2.5 rounded-full ${getStatusColor()}`}></span>
-                        <span className="text-xs font-bold text-slate-700 min-w-[3rem] text-left">{t(`status_${chatStatus}` as any)}</span>
+                        <span className="text-xs font-bold text-slate-700 min-w-[3rem] text-left hidden md:inline">{t(`status_${chatStatus}` as any)}</span>
                         <ChevronDown size={14} className="text-slate-400" />
                     </button>
 
@@ -425,6 +457,7 @@ const DevPilotApp: React.FC = () => {
                             className="absolute top-10 right-0 w-48 bg-white rounded-lg shadow-xl border border-slate-100 py-1 z-50 animate-in fade-in zoom-in-95 duration-100"
                             onClick={(e) => e.stopPropagation()}
                         >
+                            {/* ... Status Menu Content (Same as before) ... */}
                             <div className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chat Status</div>
                             {['online', 'away', 'offline'].map((s) => (
                                 <button
@@ -439,9 +472,7 @@ const DevPilotApp: React.FC = () => {
                                     {chatStatus === s && <Check size={14} className="ml-auto text-blue-600" />}
                                 </button>
                             ))}
-                            
                             <div className="h-px bg-slate-100 my-1"></div>
-                            
                             <div className="px-3 py-2 flex items-center justify-between">
                                 <span className="text-sm text-slate-700">{t('lbl_accept_tickets')}</span>
                                 <button 
@@ -474,30 +505,28 @@ const DevPilotApp: React.FC = () => {
                     )}
                 </div>
 
-                {/* Role Switcher (Demo) */}
+                {/* Role Switcher (Hidden on mobile to save space) */}
                 <button 
                     onClick={(e) => { e.stopPropagation(); toggleRole(); }} 
-                    className="text-xs px-2 py-1 bg-slate-100 rounded border border-slate-200 hover:bg-slate-200 transition-colors"
+                    className="hidden md:block text-xs px-2 py-1 bg-slate-100 rounded border border-slate-200 hover:bg-slate-200 transition-colors"
                     title="Click to switch role for demo"
                 >
                     {t('role_label')}: <span className={`${currentUser.role === UserRole.ADMIN ? 'text-blue-600' : 'text-green-600'} font-bold`}>{t(`role_${currentUser.role}` as any)}</span>
                 </button>
                 
-                <div className="h-4 w-px bg-slate-200"></div>
+                <div className="h-4 w-px bg-slate-200 hidden md:block"></div>
                 
-                <button className="relative">
+                <button className="relative hidden md:block">
                     <Bell size={18} className="text-slate-400 hover:text-slate-600 cursor-pointer" />
                     <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full"></span>
                 </button>
                 
-                <div className="relative">
+                <div className="relative hidden md:block">
                     <Settings 
                         size={18} 
                         className={`text-slate-400 hover:text-slate-600 cursor-pointer transition-transform ${isSettingsOpen ? 'rotate-90 text-blue-500' : ''}`} 
                         onClick={(e) => { e.stopPropagation(); setIsSettingsOpen(!isSettingsOpen); }}
                     />
-                    
-                    {/* Settings Dropdown */}
                     {isSettingsOpen && (
                         <div className="absolute right-0 top-8 bg-white text-slate-800 shadow-xl border border-slate-100 rounded-lg py-1 w-32 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                             <button 
@@ -516,25 +545,28 @@ const DevPilotApp: React.FC = () => {
                     onClick={() => setIsProfileModalOpen(true)}
                 >
                     <img src={currentUser.avatar} alt="Me" className="w-8 h-8 rounded-full border border-slate-200 object-cover" />
-                    <span className="text-xs font-medium text-slate-700 group-hover:text-blue-600 transition-colors">{currentUser.name}</span>
+                    <span className="text-xs font-medium text-slate-700 group-hover:text-blue-600 transition-colors hidden md:inline">{currentUser.name}</span>
                 </div>
             </div>
         </div>
 
-        {/* Workspace Content */}
-        <div className="flex-1 overflow-hidden relative">
+        {/* Workspace Content - Responsive Layout */}
+        <div className="flex-1 overflow-hidden relative flex flex-row">
             
             {/* VIEW: CHAT */}
             {activeView === 'chat' && (
-                <div className="grid grid-cols-12 h-full absolute inset-0">
-                    <div className="col-span-3 h-full border-r border-slate-200">
+                <>
+                    {/* List Panel */}
+                    <div className={`w-full md:w-80 border-r border-slate-200 bg-white flex flex-col transition-all duration-300 ${showMobileDetail ? 'hidden md:flex' : 'flex'}`}>
                         <SessionList 
                             sessions={MOCK_SESSIONS} 
                             activeSessionId={activeSessionId} 
-                            onSelectSession={setActiveSessionId} 
+                            onSelectSession={handleSessionSelect} 
                         />
                     </div>
-                    <div className="col-span-6 h-full flex flex-col">
+                    
+                    {/* Main Chat Area */}
+                    <div className={`flex-1 flex flex-col bg-slate-50 transition-all duration-300 ${showMobileDetail ? 'flex' : 'hidden md:flex'}`}>
                         <ChatArea 
                             session={activeSession}
                             messages={messages.filter(m => m.sessionId === activeSessionId)}
@@ -542,22 +574,38 @@ const DevPilotApp: React.FC = () => {
                             onSendMessage={handleSendMessage}
                             onDeleteMessage={handleDeleteMessage}
                             onUpdateMessage={handleUpdateMessage}
+                            onBack={handleBackToMobileList}
+                            onToggleContext={() => setIsMobileContextOpen(true)}
                         />
                     </div>
-                    <div className="col-span-3 h-full border-l border-slate-200 bg-white">
+
+                    {/* Context Sidebar (Desktop: Fixed, Mobile: Drawer) */}
+                    <div className={`
+                        fixed inset-y-0 right-0 z-50 w-80 bg-white shadow-2xl transform transition-transform duration-300 md:relative md:transform-none md:shadow-none md:border-l md:border-slate-200
+                        ${isMobileContextOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}
+                    `}>
+                        {/* Mobile Header for Context */}
+                        <div className="md:hidden flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
+                            <h3 className="font-bold text-slate-800">Context</h3>
+                            <button onClick={() => setIsMobileContextOpen(false)}><X size={20} className="text-slate-400"/></button>
+                        </div>
                         <RightSidebar 
                             session={activeSession}
                             currentUser={currentUser}
                             history={MOCK_HISTORY}
                         />
                     </div>
-                </div>
+                    {/* Mobile Backdrop for Context */}
+                    {isMobileContextOpen && (
+                        <div className="fixed inset-0 bg-black/20 z-40 md:hidden" onClick={() => setIsMobileContextOpen(false)}></div>
+                    )}
+                </>
             )}
 
-            {/* VIEW: MY TICKETS (Split Layout) */}
+            {/* VIEW: MY TICKETS */}
             {activeView === 'my_tickets' && (
-                <div className="grid grid-cols-12 h-full absolute inset-0">
-                     <div className="col-span-3 h-full border-r border-slate-200">
+                <>
+                    <div className={`w-full md:w-80 border-r border-slate-200 bg-white flex flex-col ${showMobileDetail ? 'hidden md:flex' : 'flex'}`}>
                          <TicketList 
                             title={ticketListTitle}
                             tickets={visibleTickets}
@@ -566,7 +614,13 @@ const DevPilotApp: React.FC = () => {
                             onCreateClick={() => handleTicketSelect('new')}
                          />
                      </div>
-                     <div className="col-span-9 h-full">
+                     <div className={`flex-1 flex flex-col bg-slate-50 ${showMobileDetail ? 'flex' : 'hidden md:flex'}`}>
+                         {/* Mobile Back Button for Ticket Detail */}
+                         <div className="md:hidden h-12 flex items-center px-4 bg-white border-b border-slate-200">
+                             <button onClick={handleBackToMobileList} className="flex items-center gap-2 text-slate-600 font-medium">
+                                 <ArrowLeft size={18}/> Back to List
+                             </button>
+                         </div>
                          <TicketDetail 
                             ticket={activeTicket}
                             isCreating={isCreatingTicket}
@@ -574,14 +628,15 @@ const DevPilotApp: React.FC = () => {
                             onSave={handleSaveTicket}
                             onCancel={() => {
                                 if (isCreatingTicket) setActiveTicketId(visibleTickets[0]?.id || null);
+                                setShowMobileDetail(false);
                             }}
                             onOpenInNewTab={() => activeTicket && openTicketInNewTab(activeTicket.id)}
                          />
                      </div>
-                </div>
+                </>
             )}
 
-            {/* VIEW: ALL TICKETS (Grid Layout + Drawer) */}
+            {/* VIEW: ALL TICKETS */}
             {activeView === 'all_tickets' && (
                 <div className="h-full w-full relative">
                     <TicketGrid 
@@ -599,7 +654,7 @@ const DevPilotApp: React.FC = () => {
                     
                     {/* Drawer Content */}
                     <div 
-                        className={`absolute top-0 right-0 h-full w-[650px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out border-l border-slate-200 ${
+                        className={`absolute top-0 right-0 h-full w-full md:w-[650px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out border-l border-slate-200 ${
                             isTicketDrawerOpen ? 'translate-x-0' : 'translate-x-full'
                         }`}
                     >

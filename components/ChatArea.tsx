@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Session, Message, User } from '../types';
-import { Send, Paperclip, Smile, Reply, Trash2, X, MoreHorizontal, FileText, ArrowRightLeft, Ticket, Power, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Send, Paperclip, Smile, Reply, Trash2, X, MoreHorizontal, FileText, ArrowRightLeft, Ticket, Power, Clock, CheckCircle, AlertCircle, ArrowLeft, Info } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { NoteModal, TransferModal, TicketModal } from './ActionModals';
 
@@ -12,9 +12,12 @@ interface ChatAreaProps {
   onDeleteMessage: (msgId: string) => void;
   // Callback to update a message content (for card interaction)
   onUpdateMessage?: (msgId: string, updates: Partial<Message>) => void;
+  // Mobile handlers
+  onBack?: () => void;
+  onToggleContext?: () => void;
 }
 
-const ChatArea: React.FC<ChatAreaProps> = ({ session, messages, currentUser, onSendMessage, onDeleteMessage, onUpdateMessage }) => {
+const ChatArea: React.FC<ChatAreaProps> = ({ session, messages, currentUser, onSendMessage, onDeleteMessage, onUpdateMessage, onBack, onToggleContext }) => {
   const [inputText, setInputText] = useState('');
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   
@@ -95,30 +98,47 @@ const ChatArea: React.FC<ChatAreaProps> = ({ session, messages, currentUser, onS
   return (
     <div className="flex flex-col h-full bg-slate-50 relative">
       {/* Header with Actions */}
-      <div className="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-6 shadow-sm z-10">
+      <div className="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-4 shadow-sm z-10">
         <div className="flex items-center gap-3">
-            <h2 className="font-bold text-slate-800 text-lg">{session.customer.name}</h2>
-            <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">
+            {/* Mobile Back Button */}
+            {onBack && (
+                <button onClick={onBack} className="md:hidden p-1 -ml-2 text-slate-500 hover:bg-slate-100 rounded-full">
+                    <ArrowLeft size={20} />
+                </button>
+            )}
+            
+            <h2 className="font-bold text-slate-800 text-base md:text-lg truncate max-w-[120px] md:max-w-none">{session.customer.name}</h2>
+            <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium hidden sm:inline">
                 {session.customer.tier}
             </span>
-            <div className="h-4 w-px bg-slate-200 mx-2"></div>
-            <div className="text-sm text-slate-500">
+            <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block"></div>
+            <div className="text-sm text-slate-500 hidden sm:block">
              {t('ticket_prefix')} #{session.id.split('-')[1]}
             </div>
         </div>
         
         {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2">
             <ActionButton icon={FileText} label={t('action_note')} onClick={() => setShowNoteModal(true)} />
             <ActionButton icon={ArrowRightLeft} label={t('action_transfer')} onClick={() => setShowTransferModal(true)} />
             <ActionButton icon={Ticket} label={t('action_ticket')} onClick={() => setShowTicketModal(true)} />
             <div className="h-6 w-px bg-slate-200 mx-1"></div>
             <ActionButton icon={Power} label={t('action_end')} onClick={handleEndSessionRequest} variant="danger" />
+            
+            {/* Mobile Context Toggle */}
+            {onToggleContext && (
+                <button 
+                    onClick={onToggleContext} 
+                    className="md:hidden ml-2 p-2 text-slate-500 hover:bg-slate-100 rounded-full"
+                >
+                    <Info size={20} />
+                </button>
+            )}
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         {messages.map((msg) => {
             const isMe = msg.senderId === currentUser.id;
             
@@ -126,7 +146,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ session, messages, currentUser, onS
             if (msg.type === 'system') {
                 return (
                     <div key={msg.id} className="flex justify-center my-4">
-                        <span className="text-xs bg-slate-100 text-slate-500 px-3 py-1 rounded-full border border-slate-200">
+                        <span className="text-xs bg-slate-100 text-slate-500 px-3 py-1 rounded-full border border-slate-200 text-center max-w-[90%]">
                             {msg.content}
                         </span>
                     </div>
@@ -160,7 +180,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ session, messages, currentUser, onS
                         <img src={session.customer.avatar} className="w-8 h-8 rounded-full border border-slate-200 mb-1" alt="Avatar"/>
                     )}
                     
-                    <div className={`max-w-[70%] flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                    <div className={`max-w-[85%] md:max-w-[70%] flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                         {/* Quote Display */}
                         {msg.replyToId && (
                             <div className={`mb-1 text-xs p-2 rounded-md border-l-2 bg-white/50 text-slate-500 ${isMe ? 'border-blue-300' : 'border-slate-300'}`}>
@@ -182,7 +202,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ session, messages, currentUser, onS
                                         <FileText size={24} className={isMe ? 'text-white' : 'text-slate-500'} />
                                     </div>
                                     <div className="flex flex-col overflow-hidden">
-                                        <span className="font-medium underline cursor-pointer truncate max-w-[180px]" title={msg.fileName}>{msg.fileName}</span>
+                                        <span className="font-medium underline cursor-pointer truncate max-w-[160px]" title={msg.fileName}>{msg.fileName}</span>
                                         <a 
                                             href={msg.fileUrl} 
                                             target="_blank" 
@@ -270,11 +290,11 @@ const ChatArea: React.FC<ChatAreaProps> = ({ session, messages, currentUser, onS
                 className="w-full bg-transparent border-none focus:ring-0 resize-none text-sm text-slate-700 max-h-32 min-h-[60px]"
             />
             <div className="flex justify-between items-center px-2 pb-1">
-                <span className="text-xs text-slate-400">{t('markdown_support')}</span>
+                <span className="text-xs text-slate-400 hidden sm:inline">{t('markdown_support')}</span>
                 <button 
                     onClick={handleSend}
                     disabled={!inputText.trim()}
-                    className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="ml-auto bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                     {t('send_btn')} <Send size={14} />
                 </button>
@@ -315,7 +335,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ session, messages, currentUser, onS
 };
 
 // --- Helper Functions for Markdown Rendering ---
-
+// (Same as before)
 const renderMessageContent = (content: string, isMe: boolean) => {
     // 1. Split by Code Blocks (triple backticks)
     const blocks = content.split(/(```[\s\S]*?```)/g);
@@ -409,7 +429,7 @@ const formatInline = (text: string, isMe: boolean) => {
 const ActionButton: React.FC<{ icon: any, label: string, onClick: () => void, variant?: 'default' | 'danger' }> = ({ icon: Icon, label, onClick, variant = 'default' }) => (
     <button 
         onClick={onClick}
-        className={`flex flex-col items-center justify-center px-3 py-1 rounded-lg transition-colors gap-1
+        className={`flex flex-col items-center justify-center px-2 md:px-3 py-1 rounded-lg transition-colors gap-1
             ${variant === 'danger' 
                 ? 'text-red-500 hover:bg-red-50' 
                 : 'text-slate-600 hover:bg-slate-100 hover:text-blue-600'
@@ -417,7 +437,7 @@ const ActionButton: React.FC<{ icon: any, label: string, onClick: () => void, va
         title={label}
     >
         <Icon size={18} />
-        <span className="text-[10px] font-medium leading-none">{label}</span>
+        <span className="hidden md:inline text-[10px] font-medium leading-none">{label}</span>
     </button>
 );
 
