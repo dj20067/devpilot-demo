@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Ticket, User, Customer } from '../types';
-import { User as UserIcon, Calendar, Tag, AlertTriangle, CheckCircle, Clock, Edit, Save, X, Users, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Ticket, User, Customer, TicketEvent } from '../types';
+import { User as UserIcon, Calendar, Tag, AlertTriangle, CheckCircle, Clock, Edit, Save, X, Users, ExternalLink, Archive, Send, Lock, Globe, Paperclip, Video, FileCode, Smile, Workflow, Trash2 } from 'lucide-react';
 import { useI18n } from '../i18n';
 
 interface TicketDetailProps {
@@ -12,10 +12,68 @@ interface TicketDetailProps {
   onOpenInNewTab?: () => void;
 }
 
+const RPASnippetViewer: React.FC<{ dslString: string }> = ({ dslString }) => {
+    const { t } = useI18n();
+    let steps = [];
+    let flowName = "Unknown Flow";
+    try {
+        const dsl = JSON.parse(dslString);
+        steps = dsl.steps || [];
+        flowName = dsl.flowName || flowName;
+    } catch (e) {
+        return <div className="text-red-500 text-xs p-2 border border-red-200 rounded bg-red-50">Invalid RPA DSL Data</div>;
+    }
+
+    return (
+        <div className="my-3 border border-slate-300 rounded-lg overflow-hidden bg-slate-50 shadow-sm max-w-md">
+            <div className="bg-slate-800 px-3 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Workflow size={14} className="text-blue-400"/>
+                    <span className="text-xs font-bold text-white tracking-wide">{t('rpa_snippet')}</span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-mono">{flowName}</span>
+            </div>
+            <div className="p-4 space-y-0 relative">
+                 {/* Connector Line */}
+                <div className="absolute left-[27px] top-4 bottom-4 w-0.5 bg-slate-200 z-0"></div>
+
+                {steps.map((step: any, idx: number) => (
+                    <div key={idx} className="flex items-center gap-3 relative z-10 mb-3 last:mb-0">
+                         {/* Node Dot */}
+                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 shadow-sm bg-white shrink-0 ${
+                             idx === 0 ? 'border-green-500 text-green-700' : 
+                             idx === steps.length - 1 ? 'border-red-500 text-red-700' : 
+                             'border-blue-400 text-blue-600'
+                         }`}>
+                             {idx + 1}
+                         </div>
+                         
+                         {/* Card */}
+                         <div className="flex-1 bg-white p-2.5 rounded border border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-default group">
+                             <div className="flex justify-between items-center mb-1">
+                                 <span className="font-bold text-xs text-slate-700">{step.action}</span>
+                                 {step.parent && <span className="text-[10px] text-slate-400">Parent: {step.parent}</span>}
+                             </div>
+                             <div className="text-[10px] text-slate-500 font-mono bg-slate-50 p-1 rounded border border-slate-100 truncate">
+                                 {JSON.stringify(step.params || step.message || step.target || step.error || {})}
+                             </div>
+                         </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
 const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, currentUser, onSave, onCancel, onOpenInNewTab }) => {
   const { t } = useI18n();
   const [isEditing, setIsEditing] = useState(false);
   
+  // View State
+  const [commTab, setCommTab] = useState<'internal' | 'customer'>('internal');
+  const [commInput, setCommInput] = useState('');
+  const [pendingAttachments, setPendingAttachments] = useState<any[]>([]);
+
   // Form State
   const [formData, setFormData] = useState<Partial<Ticket>>({});
 
@@ -30,15 +88,14 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, current
             tags: [],
             cc: [],
             collaborators: [],
-            // Defaulting customer to something for demo or null
-            // In a real app, you'd pick a customer. We will leave it undefined and rely on context or mock.
+            timeline: []
         });
     } else if (ticket) {
         setIsEditing(false);
-        setFormData({
-            ...ticket
-        });
+        setFormData({ ...ticket });
     }
+    setPendingAttachments([]);
+    setCommInput('');
   }, [ticket, isCreating]);
 
   if (!ticket && !isCreating) {
@@ -54,6 +111,67 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, current
     setIsEditing(false);
   };
 
+  const handleArchive = () => {
+      // 1. Update status to resolved
+      // 2. Add system message to timeline
+      const newEvent: TicketEvent = {
+          id: `evt-${Date.now()}`,
+          ticketId: ticket!.id,
+          sender: 'SYSTEM',
+          content: t('system_msg_archive'),
+          type: 'public_reply',
+          createdAt: new Date()
+      };
+      
+      onSave({ 
+          status: 'resolved',
+          timeline: [...(ticket!.timeline || []), newEvent]
+      });
+  };
+
+  const handleSendComment = () => {
+      if (!commInput.trim() && pendingAttachments.length === 0) return;
+      
+      const newEvent: TicketEvent = {
+          id: `evt-${Date.now()}`,
+          ticketId: ticket!.id,
+          sender: currentUser,
+          content: commInput,
+          type: commTab === 'internal' ? 'internal_note' : 'public_reply',
+          attachments: pendingAttachments,
+          createdAt: new Date()
+      };
+
+      onSave({
+          timeline: [...(ticket!.timeline || []), newEvent]
+      });
+      setCommInput('');
+      setPendingAttachments([]);
+  };
+
+  const handleUploadRpa = () => {
+      // Simulate uploading a file
+      const mockDsl = JSON.stringify({
+        flowName: "Inserted_Snippet_v2",
+        steps: [
+          { action: "Browser.Open", target: "https://example.com" },
+          { action: "Input.SetText", target: "#username", params: { value: "admin" } },
+          { action: "Input.Click", target: "#login-btn" }
+        ]
+      });
+      
+      const newAttachment = {
+          name: "login_flow_v2.rpa",
+          type: 'rpa_dsl',
+          content: mockDsl
+      };
+      setPendingAttachments([...pendingAttachments, newAttachment]);
+  };
+
+  const removeAttachment = (idx: number) => {
+      setPendingAttachments(pendingAttachments.filter((_, i) => i !== idx));
+  };
+
   const getPriorityColor = (p: string) => {
     switch(p) {
         case 'critical': return 'text-red-600 bg-red-50 border-red-200';
@@ -64,8 +182,12 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, current
   };
 
   const renderViewMode = () => {
-      // Safe guard if ticket is somehow null in view mode
       if (!ticket) return null;
+      const timeline = ticket.timeline || [];
+      const internalEvents = timeline.filter(e => e.type === 'internal_note');
+      const publicEvents = timeline.filter(e => e.type === 'public_reply' || e.type === 'system_log');
+      
+      const activeEvents = commTab === 'internal' ? internalEvents : publicEvents;
 
       return (
         <div className="flex flex-col h-full bg-slate-50/50">
@@ -77,15 +199,28 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, current
                         <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase border ${getPriorityColor(ticket.priority)}`}>
                             {t(`priority_${ticket.priority}` as any)}
                         </span>
+                        {ticket.status === 'resolved' && (
+                            <span className="text-xs px-2 py-0.5 rounded font-bold uppercase border bg-green-100 text-green-700 border-green-200 flex items-center gap-1">
+                                <CheckCircle size={12}/> {t('ticket_status_resolved')}
+                            </span>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
+                        {ticket.status !== 'resolved' && (
+                            <button 
+                                onClick={handleArchive}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors"
+                            >
+                                <Archive size={14} /> {t('btn_archive')}
+                            </button>
+                        )}
                         {onOpenInNewTab && (
                             <button 
                                 onClick={onOpenInNewTab}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors"
                                 title={t('btn_open_in_new')}
                             >
-                                <ExternalLink size={14} /> <span className="hidden sm:inline">{t('btn_open_in_new')}</span>
+                                <ExternalLink size={14} /> 
                             </button>
                         )}
                         <button 
@@ -121,37 +256,182 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, current
                 </div>
             </div>
 
-            {/* Content */}
-            <div className="p-8 flex-1 overflow-y-auto">
-                <div className="grid grid-cols-3 gap-6">
-                    {/* Left: Description & Activity */}
-                    <div className="col-span-2 space-y-6">
+            {/* Content Body */}
+            <div className="flex-1 overflow-y-auto px-8 py-6">
+                <div className="grid grid-cols-12 gap-6 h-full">
+                    {/* Main Column: Description & Communication */}
+                    <div className="col-span-8 flex flex-col gap-6">
+                        
+                        {/* 1. Description Section (Rich Content) */}
                         <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm">
-                            <h3 className="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wide">{t('lbl_desc')}</h3>
-                            <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
+                            <h3 className="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wide flex items-center justify-between">
+                                {t('lbl_desc')}
+                                <div className="flex gap-2">
+                                    <Paperclip size={14} className="text-slate-400"/>
+                                    <Video size={14} className="text-slate-400"/>
+                                </div>
+                            </h3>
+                            <div className="text-slate-700 leading-relaxed whitespace-pre-wrap font-sans text-sm">
                                 {ticket.description}
-                            </p>
+                            </div>
+                            {/* Render RPA DSL if present in description */}
+                            {ticket.descriptionRpaDsl && (
+                                <RPASnippetViewer dslString={ticket.descriptionRpaDsl} />
+                            )}
                         </div>
 
-                        <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm">
-                            <h3 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-wide">Activity Log</h3>
-                            <div className="relative pl-4 border-l-2 border-slate-100 space-y-6">
-                                <div className="relative">
-                                    <div className="absolute -left-[21px] top-0 w-3 h-3 bg-blue-500 rounded-full ring-4 ring-white"></div>
-                                    <p className="text-sm text-slate-800 font-medium">Ticket Created</p>
-                                    <p className="text-xs text-slate-400">{ticket.createdAt.toLocaleString()}</p>
-                                </div>
-                                <div className="relative">
-                                    <div className="absolute -left-[21px] top-0 w-3 h-3 bg-slate-300 rounded-full ring-4 ring-white"></div>
-                                    <p className="text-sm text-slate-800 font-medium">Status changed to <span className="uppercase">{ticket.status.replace('_', ' ')}</span></p>
-                                    <p className="text-xs text-slate-400">{ticket.updatedAt.toLocaleString()}</p>
+                        {/* 2. Communication Area */}
+                        <div className="bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col flex-1 min-h-[500px]">
+                            {/* Comm Tabs */}
+                            <div className="flex border-b border-slate-200">
+                                <button 
+                                    onClick={() => setCommTab('internal')}
+                                    className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-colors ${
+                                        commTab === 'internal' 
+                                            ? 'border-yellow-400 bg-yellow-50 text-yellow-800' 
+                                            : 'border-transparent text-slate-500 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <Lock size={14} /> {t('tab_comm_internal')}
+                                </button>
+                                <button 
+                                    onClick={() => setCommTab('customer')}
+                                    className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-colors ${
+                                        commTab === 'customer' 
+                                            ? 'border-blue-500 bg-blue-50 text-blue-800' 
+                                            : 'border-transparent text-slate-500 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <Globe size={14} /> {t('tab_comm_customer')}
+                                </button>
+                            </div>
+
+                            {/* Banner */}
+                            <div className={`px-4 py-2 text-xs text-center border-b ${
+                                commTab === 'internal' ? 'bg-yellow-100/50 text-yellow-800 border-yellow-100' : 'bg-blue-100/50 text-blue-800 border-blue-100'
+                            }`}>
+                                {commTab === 'internal' ? t('comm_internal_banner') : t('comm_customer_banner')}
+                            </div>
+
+                            {/* Message List */}
+                            <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${commTab === 'internal' ? 'bg-yellow-50/30' : 'bg-white'}`}>
+                                {activeEvents.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-slate-300">
+                                        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-2">
+                                            {commTab === 'internal' ? <Lock size={20}/> : <Globe size={20}/>}
+                                        </div>
+                                        <span className="text-xs">No records yet.</span>
+                                    </div>
+                                ) : (
+                                    activeEvents.map((evt) => {
+                                        const isSystem = typeof evt.sender === 'string';
+                                        const senderName = isSystem ? 'System' : (evt.sender as any).name;
+                                        const senderAvatar = isSystem ? '' : (evt.sender as any).avatar;
+                                        const isMe = !isSystem && (evt.sender as any).id === currentUser.id;
+
+                                        if (isSystem) {
+                                            return (
+                                                <div key={evt.id} className="flex justify-center my-2">
+                                                    <span className="text-xs bg-slate-100 text-slate-500 px-3 py-1 rounded-full border border-slate-200">
+                                                        {evt.content}
+                                                    </span>
+                                                </div>
+                                            );
+                                        }
+
+                                        return (
+                                            <div key={evt.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
+                                                <img src={senderAvatar} className="w-8 h-8 rounded-full border border-slate-200" alt=""/>
+                                                <div className={`max-w-[80%] ${isMe ? 'items-end' : 'items-start'} flex flex-col`}>
+                                                    <div className="flex items-baseline gap-2 mb-1">
+                                                        <span className="text-xs font-bold text-slate-700">{senderName}</span>
+                                                        <span className="text-[10px] text-slate-400">{evt.createdAt.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                                                    </div>
+                                                    <div className={`p-3 text-sm rounded-lg shadow-sm border ${
+                                                        isMe 
+                                                            ? (commTab === 'internal' ? 'bg-yellow-100 border-yellow-200 text-slate-800' : 'bg-blue-600 text-white border-blue-600') 
+                                                            : 'bg-white border-slate-200 text-slate-800'
+                                                    }`}>
+                                                        {evt.content}
+                                                        
+                                                        {/* Render Attachments */}
+                                                        {evt.attachments && evt.attachments.map((att, i) => (
+                                                            <div key={i} className="mt-2">
+                                                                {att.type === 'rpa_dsl' && att.content && (
+                                                                    <RPASnippetViewer dslString={att.content} />
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+
+                            {/* Input Area */}
+                            <div className="p-4 bg-white border-t border-slate-200">
+                                {pendingAttachments.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mb-2 p-2 bg-slate-50 border border-slate-100 rounded">
+                                        {pendingAttachments.map((att, i) => (
+                                            <div key={i} className="flex items-center gap-2 bg-white px-2 py-1 rounded border border-slate-200 text-xs shadow-sm">
+                                                <Workflow size={12} className="text-blue-500"/>
+                                                <span className="font-mono text-slate-700">{att.name}</span>
+                                                <button onClick={() => removeAttachment(i)} className="text-slate-400 hover:text-red-500"><X size={12}/></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <div className={`border rounded-lg p-2 focus-within:ring-2 transition-all ${
+                                    commTab === 'internal' 
+                                        ? 'border-yellow-200 focus-within:ring-yellow-400/30 bg-yellow-50/20' 
+                                        : 'border-slate-200 focus-within:ring-blue-500/20 bg-slate-50/20'
+                                }`}>
+                                    <div className="flex gap-2 mb-2 px-1">
+                                         <button className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100" title="Attach File"><Paperclip size={16}/></button>
+                                         <button 
+                                            className="p-1 text-slate-400 hover:text-blue-600 rounded hover:bg-slate-100 flex items-center gap-1 transition-colors"
+                                            title={t('btn_insert_rpa')}
+                                            onClick={handleUploadRpa}
+                                         >
+                                            <Workflow size={16}/> 
+                                         </button>
+                                         <button className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100" title="Insert Emoji"><Smile size={16}/></button>
+                                    </div>
+                                    <textarea 
+                                        value={commInput}
+                                        onChange={(e) => setCommInput(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if(e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleSendComment();
+                                            }
+                                        }}
+                                        className="w-full bg-transparent border-none focus:ring-0 outline-none resize-none text-sm min-h-[60px]"
+                                        placeholder={commTab === 'internal' ? t('comm_placeholder_internal') : t('comm_placeholder_customer')}
+                                    />
+                                    <div className="flex justify-end mt-1">
+                                        <button 
+                                            onClick={handleSendComment}
+                                            disabled={!commInput.trim() && pendingAttachments.length === 0}
+                                            className={`px-4 py-1.5 rounded text-xs font-bold text-white flex items-center gap-1.5 transition-colors ${
+                                                commTab === 'internal' 
+                                                    ? 'bg-yellow-600 hover:bg-yellow-700 disabled:bg-yellow-400' 
+                                                    : 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400'
+                                            }`}
+                                        >
+                                            {t('send_btn')} <Send size={12} />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Right: Meta */}
-                    <div className="space-y-4">
+                    {/* Sidebar Column: Meta Info */}
+                    <div className="col-span-4 space-y-4">
                          {/* Participants Section */}
                         <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
                             <h3 className="text-xs font-bold text-slate-400 mb-3 uppercase flex items-center gap-1">
@@ -265,6 +545,16 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, current
                                  className="w-full h-64 p-3 text-slate-700 border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none resize-none leading-relaxed"
                                  placeholder="Detailed description of the issue..."
                              />
+                             {/* Optional RPA DSL Edit (Simplified) */}
+                             <div className="mt-4 pt-4 border-t border-slate-100">
+                                <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">RPA DSL (JSON)</label>
+                                <textarea 
+                                    value={formData.descriptionRpaDsl || ''}
+                                    onChange={(e) => setFormData({...formData, descriptionRpaDsl: e.target.value})}
+                                    className="w-full h-24 p-3 text-xs font-mono text-slate-600 bg-slate-50 border border-slate-200 rounded-md resize-none"
+                                    placeholder='{"steps": [...] }'
+                                />
+                             </div>
                          </div>
                      </div>
 

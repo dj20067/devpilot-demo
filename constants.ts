@@ -1,5 +1,5 @@
 
-import { Session, SessionStatus, User, UserRole, Message, ServiceRecord, Customer, Ticket } from './types';
+import { Session, SessionStatus, User, UserRole, Message, ServiceRecord, Customer, Ticket, TicketEvent } from './types';
 
 // Helper to generate data based on language
 export const getMockData = (lang: 'zh' | 'en') => {
@@ -176,11 +176,23 @@ export const getMockData = (lang: 'zh' | 'en') => {
     },
   ];
 
+  const SAMPLE_RPA_DSL = JSON.stringify({
+    flowName: "DB_Reconnect_Retry",
+    steps: [
+      { id: 1, action: "TryCatch", label: "Connection Block" },
+      { id: 2, action: "Database.Connect", params: { timeout: 3000 }, parent: 1 },
+      { id: 3, action: "Catch", error: "TimeoutException", parent: 1 },
+      { id: 4, action: "Log.Error", message: "Connection failed, retrying...", parent: 3 },
+      { id: 5, action: "Wait", duration: "5s", parent: 3 }
+    ]
+  });
+
   const MOCK_TICKETS: Ticket[] = [
       {
           id: 'TIC-1024',
           subject: isZh ? '生产环境数据库连接超时' : 'Production DB Connection Timeout',
-          description: isZh ? '每晚2点备份期间出现间歇性连接超时。' : 'Intermittent connection timeouts occurring during nightly backup at 2 AM.',
+          description: isZh ? '每晚2点备份期间出现间歇性连接超时。我已经附上了 RPA 重试逻辑的片段，请检查是否有问题。' : 'Intermittent connection timeouts occurring during nightly backup at 2 AM. I have attached the RPA retry logic snippet, please check if there are any issues.',
+          descriptionRpaDsl: SAMPLE_RPA_DSL,
           status: 'open',
           priority: 'high',
           customer: MOCK_CUSTOMERS[0],
@@ -189,7 +201,33 @@ export const getMockData = (lang: 'zh' | 'en') => {
           collaborators: [OTHER_ENGINEER],
           createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
           updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 5),
-          tags: ['Database', 'Production']
+          tags: ['Database', 'Production'],
+          timeline: [
+              {
+                  id: 'evt-1',
+                  ticketId: 'TIC-1024',
+                  sender: MOCK_CUSTOMERS[0],
+                  content: isZh ? '这个问题真的很紧急，我们的夜间批处理任务都失败了。' : 'This is really urgent, our nightly batch jobs are failing.',
+                  type: 'public_reply',
+                  createdAt: new Date(Date.now() - 1000 * 60 * 60 * 40)
+              },
+              {
+                  id: 'evt-2',
+                  ticketId: 'TIC-1024',
+                  sender: CURRENT_USER,
+                  content: isZh ? '我检查了日志，看起来是连接池耗尽了。@Sarah 你能看一下数据库配置吗？' : 'I checked the logs, looks like connection pool exhaustion. @Sarah can you check the DB config?',
+                  type: 'internal_note',
+                  createdAt: new Date(Date.now() - 1000 * 60 * 60 * 30)
+              },
+              {
+                  id: 'evt-3',
+                  ticketId: 'TIC-1024',
+                  sender: OTHER_ENGINEER,
+                  content: isZh ? '已确认，最大连接数设置得太低了。建议增加到 200。' : 'Confirmed. Max connections is set too low. Suggest increasing to 200.',
+                  type: 'internal_note',
+                  createdAt: new Date(Date.now() - 1000 * 60 * 60 * 10)
+              }
+          ]
       },
       {
           id: 'TIC-1025',
@@ -201,7 +239,8 @@ export const getMockData = (lang: 'zh' | 'en') => {
           assignee: CURRENT_USER,
           createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5),
           updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1),
-          tags: ['UI/UX', 'Feature']
+          tags: ['UI/UX', 'Feature'],
+          timeline: []
       },
       {
         id: 'TIC-1026',
@@ -212,9 +251,9 @@ export const getMockData = (lang: 'zh' | 'en') => {
         customer: MOCK_CUSTOMERS[0],
         createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10),
         updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
-        tags: ['Bug', 'PDF']
+        tags: ['Bug', 'PDF'],
+        timeline: []
       },
-      // Added a ticket that is NOT assigned to current user, but they are CC'd
       {
         id: 'TIC-1027',
         subject: isZh ? '[CC] 支付网关 502 错误' : '[CC] Payment Gateway 502 Error',
@@ -227,9 +266,9 @@ export const getMockData = (lang: 'zh' | 'en') => {
         collaborators: [],
         createdAt: new Date(Date.now() - 1000 * 60 * 60 * 4),
         updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 1),
-        tags: ['Payment', 'API']
+        tags: ['Payment', 'API'],
+        timeline: []
       },
-       // Added a ticket that is unrelated to current user (for All Tickets view)
        {
         id: 'TIC-1028',
         subject: isZh ? '移动端登录界面偏移' : 'Mobile Login UI Misaligned',
@@ -242,7 +281,8 @@ export const getMockData = (lang: 'zh' | 'en') => {
         collaborators: [],
         createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48),
         updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24),
-        tags: ['Mobile', 'UI']
+        tags: ['Mobile', 'UI'],
+        timeline: []
       }
   ];
 

@@ -57,10 +57,13 @@ const translations: Record<Language, Record<string, string>> = {
     btn_edit: "编辑",
     btn_create: "创建",
     btn_open_in_new: "在新页面打开",
+    btn_archive: "归档",
+    btn_archive_confirm: "确认解决并归档",
     toast_note_saved: "服务小记已保存",
     toast_transferred: "会话已转接",
     toast_ticket_created: "工单已创建",
     toast_ticket_saved: "工单已保存",
+    toast_archived: "工单已归档，等待客户确认",
 
     // End Session Card
     end_card_title: "工程师请求结束会话",
@@ -108,6 +111,7 @@ const translations: Record<Language, Record<string, string>> = {
     // Ticket List & Detail
     tickets_title: "工单管理",
     ticket_search_placeholder: "搜索工单ID或主题...",
+    ticket_grid_search_placeholder: "搜索 ID / 主题 / 客户...",
     no_tickets: "没有找到工单",
     lbl_priority: "优先级",
     lbl_assignee: "负责人",
@@ -118,14 +122,39 @@ const translations: Record<Language, Record<string, string>> = {
     lbl_tags: "标签",
     lbl_new_ticket: "新建工单",
     lbl_edit_ticket: "编辑工单",
+    ticket_status_all: "全部状态",
     ticket_status_open: "待处理",
     ticket_status_in_progress: "处理中",
     ticket_status_resolved: "已解决",
     ticket_status_closed: "已关闭",
+    priority_all: "全部优先级",
     priority_low: "低",
     priority_medium: "中",
     priority_high: "高",
     priority_critical: "紧急",
+    
+    // Ticket Filters
+    filter_label_status: "状态",
+    filter_label_priority: "优先级",
+    filter_label_assignee: "负责人",
+    filter_label_date: "日期范围",
+    filter_assignee_all: "全部负责人",
+    filter_assignee_unassigned: "无负责人",
+    filter_date_created: "创建时间",
+    filter_date_updated: "更新时间",
+    filter_reset: "重置筛选",
+
+    // Ticket Communication
+    tab_comm_internal: "内部协作",
+    tab_comm_customer: "客户沟通",
+    comm_placeholder_internal: "发送内部备注 (客户不可见)...",
+    comm_placeholder_customer: "回复客户 (Shift+Enter 换行)...",
+    comm_internal_banner: "内部协作区：消息仅对团队成员可见。",
+    comm_customer_banner: "客户沟通区：消息将实时发送给客户。",
+    rpa_snippet: "RPA 流程片段",
+    btn_insert_rpa: "插入 RPA 片段",
+    rpa_attachment_preview: "RPA 流程文件",
+    system_msg_archive: "系统：工程师标记该问题已解决，请确认解决方案。",
 
     // Ticket Grid Columns
     col_id: "工单号",
@@ -145,7 +174,7 @@ const translations: Record<Language, Record<string, string>> = {
     lbl_signed: "签约年份",
     lbl_partner: "合作伙伴类型",
     lbl_cust_status: "客户状态",
-    lbl_service_grp: "服务组",
+    lbl_service_grp: "Service Group",
     
     // Modal
     modal_title: "服务详情",
@@ -208,10 +237,13 @@ const translations: Record<Language, Record<string, string>> = {
     btn_edit: "Edit",
     btn_create: "Create",
     btn_open_in_new: "Open in New Page",
+    btn_archive: "Archive",
+    btn_archive_confirm: "Confirm & Archive",
     toast_note_saved: "Note saved",
     toast_transferred: "Session transferred",
     toast_ticket_created: "Ticket created",
     toast_ticket_saved: "Ticket saved",
+    toast_archived: "Ticket archived, awaiting customer confirmation",
 
     // End Session Card
     end_card_title: "Request to End Session",
@@ -259,6 +291,7 @@ const translations: Record<Language, Record<string, string>> = {
     // Ticket List & Detail
     tickets_title: "Tickets",
     ticket_search_placeholder: "Search Ticket ID or Subject...",
+    ticket_grid_search_placeholder: "Search ID / Subject / Customer...",
     no_tickets: "No tickets found",
     lbl_priority: "Priority",
     lbl_assignee: "Assignee",
@@ -269,14 +302,39 @@ const translations: Record<Language, Record<string, string>> = {
     lbl_tags: "Tags",
     lbl_new_ticket: "New Ticket",
     lbl_edit_ticket: "Edit Ticket",
+    ticket_status_all: "All Status",
     ticket_status_open: "Open",
     ticket_status_in_progress: "In Progress",
     ticket_status_resolved: "Resolved",
     ticket_status_closed: "Closed",
+    priority_all: "All Priorities",
     priority_low: "Low",
     priority_medium: "Medium",
     priority_high: "High",
     priority_critical: "Critical",
+
+    // Ticket Filters
+    filter_label_status: "Status",
+    filter_label_priority: "Priority",
+    filter_label_assignee: "Assignee",
+    filter_label_date: "Date Range",
+    filter_assignee_all: "All Assignees",
+    filter_assignee_unassigned: "Unassigned",
+    filter_date_created: "Created Date",
+    filter_date_updated: "Updated Date",
+    filter_reset: "Reset Filters",
+
+    // Ticket Communication
+    tab_comm_internal: "Internal Notes",
+    tab_comm_customer: "Customer Reply",
+    comm_placeholder_internal: "Add internal note (Hidden from customer)...",
+    comm_placeholder_customer: "Reply to customer (Shift+Enter for new line)...",
+    comm_internal_banner: "Internal Zone: Messages visible only to team members.",
+    comm_customer_banner: "Customer Zone: Messages are sent to customer in real-time.",
+    rpa_snippet: "RPA Process Snippet",
+    btn_insert_rpa: "Insert RPA Snippet",
+    rpa_attachment_preview: "RPA Process File",
+    system_msg_archive: "System: Engineer marked this issue as resolved. Please confirm the solution.",
     
     // Ticket Grid Columns
     col_id: "ID",

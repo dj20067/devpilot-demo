@@ -60,10 +60,21 @@ export interface ServiceRecord {
   agent: string;
 }
 
+export interface TicketEvent {
+    id: string;
+    ticketId: string;
+    sender: User | Customer | 'SYSTEM';
+    content: string; // Supports markdown or rich text html
+    type: 'internal_note' | 'public_reply' | 'system_log';
+    attachments?: { name: string, type: 'image' | 'file' | 'video' | 'rpa_dsl', url?: string, content?: string }[];
+    createdAt: Date;
+}
+
 export interface Ticket {
     id: string;
     subject: string;
-    description: string;
+    description: string; // Main issue description
+    descriptionRpaDsl?: string; // Optional JSON string for RPA snippet in description
     status: 'open' | 'in_progress' | 'resolved' | 'closed';
     priority: 'low' | 'medium' | 'high' | 'critical';
     customer: Customer;
@@ -73,6 +84,7 @@ export interface Ticket {
     createdAt: Date;
     updatedAt: Date;
     tags: string[];
+    timeline: TicketEvent[]; // New: Unified timeline for communication
 }
 
 export interface ConsultationForm {

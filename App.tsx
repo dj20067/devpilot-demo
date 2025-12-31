@@ -35,18 +35,6 @@ const StandaloneTicketPage: React.FC<{ ticket: Ticket; currentUser: User; onSave
                             onCancel={() => {}}
                         />
                     </div>
-                    {/* Placeholder for Communication Area */}
-                    <div className="h-1/3 border-t border-slate-200 bg-slate-50 p-6">
-                        <div className="flex items-center gap-4 mb-4 border-b border-slate-200 pb-2">
-                             <button className="text-sm font-bold text-blue-600 border-b-2 border-blue-600 pb-2 -mb-2.5">Customer Communication</button>
-                             <button className="text-sm font-medium text-slate-500 hover:text-slate-700 pb-2">Internal Notes</button>
-                        </div>
-                        <div className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-slate-200 rounded-lg text-slate-400">
-                             <MessageSquare size={24} className="mb-2 opacity-50"/>
-                             <span className="text-sm font-medium">Communication Area Placeholder</span>
-                             <span className="text-xs">Chat with customer or leave internal comments here.</span>
-                        </div>
-                    </div>
                 </div>
 
                 {/* Context Sidebar (Simplified RightSidebar) */}
@@ -224,6 +212,7 @@ const DevPilotApp: React.FC = () => {
               tags: ticketData.tags || [],
               createdAt: new Date(),
               updatedAt: new Date(),
+              timeline: []
           } as Ticket;
           setTickets([newTicket, ...tickets]);
           setActiveTicketId(newTicket.id);
