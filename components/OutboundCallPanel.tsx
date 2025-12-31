@@ -6,11 +6,12 @@ import { Customer } from '../types';
 interface OutboundCallPanelProps {
     onClose: () => void;
     contextCustomer?: Customer; // Injected from the current active session/ticket
+    initialNumber?: string;
 }
 
 type CallStage = 'idle' | 'calling' | 'post_call';
 
-const OutboundCallPanel: React.FC<OutboundCallPanelProps> = ({ onClose, contextCustomer }) => {
+const OutboundCallPanel: React.FC<OutboundCallPanelProps> = ({ onClose, contextCustomer, initialNumber }) => {
     const { t } = useI18n();
     const [number, setNumber] = useState('');
     const [callStage, setCallStage] = useState<CallStage>('idle');
@@ -23,17 +24,23 @@ const OutboundCallPanel: React.FC<OutboundCallPanelProps> = ({ onClose, contextC
 
     // Initialize association based on context
     useEffect(() => {
+        // If a customer context exists (we are in a session or ticket), default to associating the call with them.
+        // The agent can remove this association if they are calling someone else (e.g. a colleague).
         if (contextCustomer) {
             setAssociatedCustomer(contextCustomer);
-            if (contextCustomer.phone) {
-                // Remove formatting for dialer display if needed, keeping simple for now
-                setNumber(contextCustomer.phone.replace(/[^\d+*#]/g, ''));
-            }
         }
+
+        if (initialNumber) {
+            setNumber(initialNumber);
+        } else if (contextCustomer && contextCustomer.phone) {
+            // If no explicit number requested (just opened dialer), pre-fill with customer profile phone
+            setNumber(contextCustomer.phone.replace(/[^\d+*#]/g, ''));
+        }
+        
         if (inputRef.current) {
             inputRef.current.focus();
         }
-    }, [contextCustomer]);
+    }, [contextCustomer, initialNumber]);
 
     // Dragging Logic
     useEffect(() => {

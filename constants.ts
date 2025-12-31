@@ -8,14 +8,14 @@ export const getMockData = (lang: 'zh' | 'en') => {
 
   const CURRENT_USER: User = {
     id: 'eng-001',
-    name: isZh ? '陈阿列克斯' : 'Alex Chen',
+    name: isZh ? '陈远' : 'Chen Yuan',
     avatar: 'https://picsum.photos/id/1005/200/200',
     role: UserRole.ADMIN,
   };
 
   const OTHER_ENGINEER: User = {
     id: 'eng-002',
-    name: isZh ? '莎拉·史密斯' : 'Sarah Smith',
+    name: isZh ? '林晓' : 'Lin Xiao',
     avatar: 'https://picsum.photos/id/1027/200/200',
     role: UserRole.ENGINEER,
   };
@@ -23,35 +23,35 @@ export const getMockData = (lang: 'zh' | 'en') => {
   const MOCK_CUSTOMERS: Customer[] = [
     {
       id: 'cust-001',
-      name: isZh ? '莎拉·康纳' : 'Sarah Connor',
-      email: 'sarah.c@skynet.com',
+      name: isZh ? '张伟' : 'Zhang Wei',
+      email: 'zhang.wei@geektech.com',
       avatar: 'https://picsum.photos/id/237/200/200',
       tenantType: isZh ? '企业版' : 'Enterprise',
       accountType: isZh ? '付费' : 'Paid',
       tier: 'VIP',
-      phone: '+1 555-0199',
-      company: isZh ? '赛博达因系统' : 'Cyberdyne Systems',
+      phone: '+86 138-0000-0001',
+      company: isZh ? '极客科技' : 'GeekTech Systems',
       certificateLevel: isZh ? '大师级' : 'Master',
       customerStatus: isZh ? '活跃' : 'Active',
       partnershipType: isZh ? '金牌合作伙伴' : 'Gold Partner',
-      region: isZh ? '北美' : 'NA',
+      region: isZh ? '华东区' : 'East CN',
       serviceGroup: isZh ? 'RPA 核心组' : 'RPA Core',
       signedYear: '2021',
     },
     {
       id: 'cust-002',
-      name: isZh ? '李约翰' : 'John Doe',
-      email: 'john.d@acme.inc',
+      name: isZh ? '刘洋' : 'Liu Yang',
+      email: 'liu.yang@huitong.com',
       avatar: 'https://picsum.photos/id/1025/200/200',
       tenantType: isZh ? '中小企业' : 'SME',
       accountType: isZh ? '试用' : 'Trial',
       tier: 'L1',
-      phone: '+1 555-0123',
-      company: isZh ? '阿克梅公司' : 'Acme Corp',
+      phone: '+86 139-0000-0002',
+      company: isZh ? '汇通物流' : 'Huitong Logistics',
       certificateLevel: isZh ? '专业级' : 'Professional',
       customerStatus: isZh ? '新客' : 'New',
       partnershipType: isZh ? '直销' : 'Direct',
-      region: isZh ? '欧洲中东非洲' : 'EMEA',
+      region: isZh ? '华北区' : 'North CN',
       serviceGroup: isZh ? '云集成' : 'Cloud Integration',
       signedYear: '2023',
     },
@@ -64,7 +64,7 @@ export const getMockData = (lang: 'zh' | 'en') => {
       customer: MOCK_CUSTOMERS[0],
       startTime: new Date(Date.now() - 1000 * 60 * 15),
       duration: '00:15:23',
-      source: isZh ? 'IDE 插件' : 'IDE Plugin',
+      source: isZh ? 'IDE 插件 (v2.4)' : 'IDE Plugin (v2.4)',
       handlerId: 'eng-001',
       lastMessage: isZh ? '选择器在登录页面失效了。' : 'The selector is failing on the login screen.',
       unreadCount: 1,
@@ -74,6 +74,7 @@ export const getMockData = (lang: 'zh' | 'en') => {
         severity: isZh ? '严重' : 'Critical',
         description: isZh ? 'v2.4 更新后机器人停止工作，找不到选择器。' : 'Bot stops working after update v2.4. Selectors are not found.',
         version: '2.4.1',
+        phone: '+86 138-0000-0001', // Pre-filled in form
       },
     },
     {
@@ -82,16 +83,17 @@ export const getMockData = (lang: 'zh' | 'en') => {
       customer: MOCK_CUSTOMERS[1],
       startTime: new Date(Date.now() - 1000 * 60 * 2),
       duration: '00:02:00',
-      source: isZh ? 'Web 门户' : 'Web Portal',
+      source: isZh ? 'Web 门户 (旧版)' : 'Web Portal (Legacy)',
       handlerId: '',
-      lastMessage: isZh ? '我该如何重置 API 密钥？' : 'How do I reset my API key?',
-      unreadCount: 0,
+      lastMessage: isZh ? '我的手机号是 +86 139-0000-0002' : 'My number is +86 139-0000-0002',
+      unreadCount: 2,
       consultationForm: {
         productModule: isZh ? 'API 网关' : 'API Gateway',
         environment: isZh ? '开发环境' : 'Dev',
         severity: isZh ? '轻微' : 'Minor',
         description: isZh ? '需要帮助轮换密钥。' : 'Need help rotating keys.',
         version: 'N/A',
+        phone: '', // No phone in form (Legacy user)
       },
     },
     {
@@ -110,11 +112,22 @@ export const getMockData = (lang: 'zh' | 'en') => {
         severity: isZh ? '主要' : 'Major',
         description: isZh ? '发票金额差异。' : 'Invoice discrepancy.',
         version: 'N/A',
+        phone: '+86 139-0000-0002',
       },
     },
   ];
 
   const MOCK_MESSAGES: Message[] = [
+    // --- SESSION 1: Normal Flow with Pre-filled Form ---
+    {
+        id: 'msg-0-s1',
+        sessionId: 'sess-001',
+        senderId: 'cust-001', // System generated on behalf of customer usually, but we use senderId for avatar sometimes. Using specific type.
+        content: '', // Content irrelevant for card type
+        timestamp: new Date(Date.now() - 1000 * 60 * 15),
+        type: 'consultation_card',
+        consultationData: MOCK_SESSIONS[0].consultationForm
+    },
     {
       id: 'msg-1',
       sessionId: 'sess-001',
@@ -127,7 +140,7 @@ export const getMockData = (lang: 'zh' | 'en') => {
       id: 'msg-2',
       sessionId: 'sess-001',
       senderId: 'eng-001',
-      content: isZh ? '你好莎拉，我来帮你处理。请问你看到的具体错误代码是什么？' : 'Hello Sarah, I can certainly help with that. Could you please provide the specific error code you are seeing?',
+      content: isZh ? '你好张总，我来帮你处理。请问你看到的具体错误代码是什么？' : 'Hello Mr. Zhang, I can certainly help with that. Could you please provide the specific error code you are seeing?',
       timestamp: new Date(Date.now() - 1000 * 60 * 12),
       type: 'text',
     },
@@ -147,6 +160,41 @@ export const getMockData = (lang: 'zh' | 'en') => {
       timestamp: new Date(Date.now() - 1000 * 60 * 8),
       type: 'text',
     },
+
+    // --- SESSION 2: Legacy User (No Phone in Form) ---
+    {
+        id: 'msg-0-s2',
+        sessionId: 'sess-002',
+        senderId: 'cust-002',
+        content: '',
+        timestamp: new Date(Date.now() - 1000 * 60 * 5),
+        type: 'consultation_card',
+        consultationData: MOCK_SESSIONS[1].consultationForm // This one has empty phone
+    },
+    {
+        id: 'msg-1-s2',
+        sessionId: 'sess-002',
+        senderId: 'cust-002',
+        content: isZh ? '我该如何重置 API 密钥？' : 'How do I reset my API key?',
+        timestamp: new Date(Date.now() - 1000 * 60 * 4),
+        type: 'text',
+    },
+    {
+        id: 'msg-2-s2',
+        sessionId: 'sess-002',
+        senderId: 'eng-001',
+        content: isZh ? '这个问题可能需要核实您的身份。为了方便沟通，可以方便留一下您的手机号吗？' : 'I might need to verify your identity for this. Could you please provide your phone number for better communication?',
+        timestamp: new Date(Date.now() - 1000 * 60 * 3),
+        type: 'text',
+    },
+    {
+        id: 'msg-3-s2',
+        sessionId: 'sess-002',
+        senderId: 'cust-002',
+        content: isZh ? '没问题，我的手机号是 +86 139-0000-0002。' : 'Sure, my number is +86 139-0000-0002.',
+        timestamp: new Date(Date.now() - 1000 * 60 * 1),
+        type: 'text',
+    }
   ];
 
   const MOCK_HISTORY: ServiceRecord[] = [
@@ -156,7 +204,7 @@ export const getMockData = (lang: 'zh' | 'en') => {
       date: '2023-10-25',
       summary: isZh ? 'Chrome 扩展程序崩溃' : 'Chrome Extension Crash',
       status: isZh ? '已解决' : 'Resolved',
-      agent: isZh ? '陈阿列克斯' : 'Alex Chen',
+      agent: isZh ? '陈远' : 'Chen Yuan',
     },
     {
       id: 'rec-2',
@@ -164,7 +212,7 @@ export const getMockData = (lang: 'zh' | 'en') => {
       date: '2023-10-10',
       summary: isZh ? '许可证续期咨询' : 'License Renewal Inquiry',
       status: isZh ? '已关闭' : 'Closed',
-      agent: isZh ? '计费团队' : 'Billing Team',
+      agent: isZh ? '财务团队' : 'Billing Team',
     },
     {
       id: 'rec-3',
@@ -172,7 +220,7 @@ export const getMockData = (lang: 'zh' | 'en') => {
       date: '2023-09-15',
       summary: isZh ? '入职培训会议' : 'Onboarding Session',
       status: isZh ? '已解决' : 'Resolved',
-      agent: isZh ? '莎拉·史密斯' : 'Sarah Smith',
+      agent: isZh ? '林晓' : 'Lin Xiao',
     },
   ];
 
@@ -215,7 +263,7 @@ export const getMockData = (lang: 'zh' | 'en') => {
                   id: 'evt-2',
                   ticketId: 'TIC-1024',
                   sender: CURRENT_USER,
-                  content: isZh ? '我检查了日志，看起来是连接池耗尽了。@Sarah 你能看一下数据库配置吗？' : 'I checked the logs, looks like connection pool exhaustion. @Sarah can you check the DB config?',
+                  content: isZh ? '我检查了日志，看起来是连接池耗尽了。@林晓 你能看一下数据库配置吗？' : 'I checked the logs, looks like connection pool exhaustion. @Lin Xiao can you check the DB config?',
                   type: 'internal_note',
                   createdAt: new Date(Date.now() - 1000 * 60 * 60 * 30)
               },

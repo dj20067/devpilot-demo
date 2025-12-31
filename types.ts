@@ -36,19 +36,30 @@ export interface Customer {
   signedYear?: string;
 }
 
+export interface ConsultationForm {
+  productModule: string;
+  environment: string;
+  severity: string;
+  description: string;
+  version: string;
+  phone?: string; // Optional: Some users might come from legacy entry points without phone
+}
+
 export interface Message {
   id: string;
   sessionId: string;
   senderId: string;
   content: string;
   timestamp: Date;
-  type: 'text' | 'image' | 'file' | 'system' | 'system_end_confirmation'; // Added system types
+  type: 'text' | 'image' | 'file' | 'system' | 'system_end_confirmation' | 'consultation_card'; // Added consultation_card
   fileUrl?: string;
   fileName?: string;
   isDeleted?: boolean;
   replyToId?: string;
   // For End Confirmation Card
   endConfirmationStatus?: 'pending' | 'solved' | 'unsolved';
+  // For Consultation Card (snapshot of data)
+  consultationData?: ConsultationForm;
 }
 
 export interface ServiceRecord {
@@ -85,14 +96,6 @@ export interface Ticket {
     updatedAt: Date;
     tags: string[];
     timeline: TicketEvent[]; // New: Unified timeline for communication
-}
-
-export interface ConsultationForm {
-  productModule: string;
-  environment: string;
-  severity: string;
-  description: string;
-  version: string;
 }
 
 export interface Session {

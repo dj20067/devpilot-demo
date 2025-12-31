@@ -8,7 +8,7 @@ import TicketDetail from './components/TicketDetail';
 import TicketGrid from './components/TicketGrid'; 
 import OutboundCallPanel from './components/OutboundCallPanel';
 import { getMockData } from './constants';
-import { UserRole, Message, Ticket, User } from './types';
+import { UserRole, Message, Ticket, User, Customer } from './types';
 import { Settings, Bell, Globe, X, Archive, Phone, Mic, MicOff, ChevronDown, Check, Shield, AlertTriangle, Info, Menu, ArrowLeft } from 'lucide-react';
 import { I18nProvider, useI18n } from './i18n';
 import { ProfileModal } from './components/ProfileModal';
@@ -39,7 +39,12 @@ const SystemToast: React.FC<ToastProps> = ({ message, type, onClose }) => {
 };
 
 // Standalone Page Layout for heavy interactions
-const StandaloneTicketPage: React.FC<{ ticket: Ticket; currentUser: User; onSave: (d: Partial<Ticket>) => void; }> = ({ ticket, currentUser, onSave }) => {
+const StandaloneTicketPage: React.FC<{ 
+    ticket: Ticket; 
+    currentUser: User; 
+    onSave: (d: Partial<Ticket>) => void;
+    onOutboundCall: (number: string, customer?: Customer) => void;
+}> = ({ ticket, currentUser, onSave, onOutboundCall }) => {
     return (
         <div className="h-screen flex flex-col bg-slate-100 overflow-hidden">
             {/* Simple Top Bar */}
@@ -60,6 +65,7 @@ const StandaloneTicketPage: React.FC<{ ticket: Ticket; currentUser: User; onSave
                             currentUser={currentUser}
                             onSave={onSave}
                             onCancel={() => {}}
+                            onOutboundCall={onOutboundCall}
                         />
                     </div>
                 </div>
@@ -135,8 +141,10 @@ const DevPilotApp: React.FC = () => {
   const [audioEnabled, setAudioEnabled] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
 
-  // UI State
-  const [showCallPanel, setShowCallPanel] = useState(false);
+  // UI State - Call Panel
+  const [callPanelState, setCallPanelState] = useState<{isOpen: boolean, number?: string, customer?: Customer}>({
+      isOpen: false
+  });
   const [toast, setToast] = useState<{msg: string, type: 'success' | 'error' | 'info'} | null>(null);
 
   // Ticket State
@@ -148,6 +156,18 @@ const DevPilotApp: React.FC = () => {
 
   // Standalone Mode
   const [standaloneTicketId, setStandaloneTicketId] = useState<string | null>(null);
+
+  const handleOpenCallPanel = (number?: string, customer?: Customer) => {
+      setCallPanelState({
+          isOpen: true,
+          number: number,
+          customer: customer
+      });
+  };
+
+  const handleCloseCallPanel = () => {
+      setCallPanelState({ ...callPanelState, isOpen: false });
+  };
 
   // Audio System: Verify and Play Success Tone
   const verifyAndEnableAudio = async (silentMode: boolean = false) => {
@@ -395,7 +415,7 @@ const DevPilotApp: React.FC = () => {
               </div>
           );
       }
-      return <StandaloneTicketPage ticket={ticket} currentUser={currentUser} onSave={handleSaveTicket} />;
+      return <StandaloneTicketPage ticket={ticket} currentUser={currentUser} onSave={handleSaveTicket} onOutboundCall={handleOpenCallPanel} />;
   }
 
   // --- RENDER NORMAL APP ---
@@ -432,11 +452,11 @@ const DevPilotApp: React.FC = () => {
                 
                 {/* Outbound Call Trigger */}
                 <button 
-                    onClick={() => setShowCallPanel(!showCallPanel)}
-                    className={`p-2 rounded-lg transition-colors border ${showCallPanel ? 'bg-green-100 text-green-700 border-green-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-slate-700'}`}
+                    onClick={() => handleOpenCallPanel()}
+                    className={`p-2 rounded-lg transition-colors border ${callPanelState.isOpen ? 'bg-green-100 text-green-700 border-green-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-slate-700'}`}
                     title={t('btn_outbound_call')}
                 >
-                    <Phone size={16} className={showCallPanel ? 'fill-current' : ''} />
+                    <Phone size={16} className={callPanelState.isOpen ? 'fill-current' : ''} />
                 </button>
 
                 <div className="h-6 w-px bg-slate-200 mx-1 hidden md:block"></div>
@@ -576,6 +596,7 @@ const DevPilotApp: React.FC = () => {
                             onUpdateMessage={handleUpdateMessage}
                             onBack={handleBackToMobileList}
                             onToggleContext={() => setIsMobileContextOpen(true)}
+                            onOutboundCall={handleOpenCallPanel}
                         />
                     </div>
 
@@ -593,6 +614,7 @@ const DevPilotApp: React.FC = () => {
                             session={activeSession}
                             currentUser={currentUser}
                             history={MOCK_HISTORY}
+                            onOutboundCall={handleOpenCallPanel}
                         />
                     </div>
                     {/* Mobile Backdrop for Context */}
@@ -631,6 +653,7 @@ const DevPilotApp: React.FC = () => {
                                 setShowMobileDetail(false);
                             }}
                             onOpenInNewTab={() => activeTicket && openTicketInNewTab(activeTicket.id)}
+                            onOutboundCall={handleOpenCallPanel}
                          />
                      </div>
                 </>
@@ -674,6 +697,7 @@ const DevPilotApp: React.FC = () => {
                                 onSave={handleSaveTicket}
                                 onCancel={() => setIsTicketDrawerOpen(false)}
                                 onOpenInNewTab={() => activeTicket && openTicketInNewTab(activeTicket.id)}
+                                onOutboundCall={handleOpenCallPanel}
                             />
                          </div>
                     </div>
@@ -683,10 +707,11 @@ const DevPilotApp: React.FC = () => {
         </div>
 
         {/* Global Floating Panels */}
-        {showCallPanel && (
+        {callPanelState.isOpen && (
             <OutboundCallPanel 
-                onClose={() => setShowCallPanel(false)} 
-                contextCustomer={currentContextCustomer}
+                onClose={handleCloseCallPanel} 
+                contextCustomer={callPanelState.customer || currentContextCustomer}
+                initialNumber={callPanelState.number}
             />
         )}
 

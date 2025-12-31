@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Ticket, User, Customer, TicketEvent } from '../types';
-import { User as UserIcon, Calendar, Tag, AlertTriangle, CheckCircle, Clock, Edit, Save, X, Users, ExternalLink, Archive, Send, Lock, Globe, Paperclip, Video, FileCode, Smile, Workflow, Trash2 } from 'lucide-react';
+import { User as UserIcon, Calendar, Tag, AlertTriangle, CheckCircle, Clock, Edit, Save, X, Users, ExternalLink, Archive, Send, Lock, Globe, Paperclip, Video, FileCode, Smile, Workflow, Trash2, ChevronDown, ChevronUp, Briefcase, Zap, Phone } from 'lucide-react';
 import { useI18n } from '../i18n';
 
 interface TicketDetailProps {
@@ -10,7 +10,18 @@ interface TicketDetailProps {
   onSave: (data: Partial<Ticket>) => void;
   onCancel: () => void;
   onOpenInNewTab?: () => void;
+  onOutboundCall?: (number: string, customer?: Customer) => void;
 }
+
+// --- Mock Data for Mentions ---
+const MENTION_CANDIDATES = [
+    { id: 'u1', name: '林晓', handle: 'LinXiao', type: 'user', avatar: 'https://picsum.photos/id/1027/200/200', desc: 'RPA 专家 / 技术主管' },
+    { id: 'u2', name: '王强', handle: 'WangQiang', type: 'user', avatar: 'https://picsum.photos/id/1011/200/200', desc: '云架构师' },
+    { id: 'u3', name: '赵敏', handle: 'ZhaoMin', type: 'user', avatar: 'https://picsum.photos/id/1025/200/200', desc: '产品经理' },
+    { id: 'g1', name: '财务支持', handle: 'Billing', type: 'group', desc: '财务与支付网关团队' },
+    { id: 'g2', name: 'RPA核心组', handle: 'RPA_Core', type: 'group', desc: 'L2/L3 研发组' },
+    { id: 'g3', name: '安全团队', handle: 'SecOps', type: 'group', desc: '合规与访问控制' },
+];
 
 const RPASnippetViewer: React.FC<{ dslString: string }> = ({ dslString }) => {
     const { t } = useI18n();
@@ -65,14 +76,23 @@ const RPASnippetViewer: React.FC<{ dslString: string }> = ({ dslString }) => {
     )
 }
 
-const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, currentUser, onSave, onCancel, onOpenInNewTab }) => {
+const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, currentUser, onSave, onCancel, onOpenInNewTab, onOutboundCall }) => {
   const { t } = useI18n();
   const [isEditing, setIsEditing] = useState(false);
+  const [isDescExpanded, setIsDescExpanded] = useState(true);
   
   // View State
   const [commTab, setCommTab] = useState<'internal' | 'customer'>('internal');
-  const [commInput, setCommInput] = useState('');
   const [pendingAttachments, setPendingAttachments] = useState<any[]>([]);
+  
+  // Mention State
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [activeMentionIndex, setActiveMentionIndex] = useState(0);
+  
+  // Ref for the contentEditable div
+  const editorRef = useRef<HTMLDivElement>(null);
+  // Store the actual range position for replacement
+  const mentionRangeRef = useRef<Range | null>(null);
 
   // Form State
   const [formData, setFormData] = useState<Partial<Ticket>>({});
@@ -90,12 +110,18 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, current
             collaborators: [],
             timeline: []
         });
+        setIsDescExpanded(true); // Always expand when creating
     } else if (ticket) {
         setIsEditing(false);
         setFormData({ ...ticket });
+
+        // Logic: Auto-collapse if there are comments/timeline events
+        const hasHistory = ticket.timeline && ticket.timeline.length > 0;
+        setIsDescExpanded(!hasHistory);
     }
     setPendingAttachments([]);
-    setCommInput('');
+    if (editorRef.current) editorRef.current.innerHTML = ''; // Clear editor
+    setMentionQuery(null);
   }, [ticket, isCreating]);
 
   if (!ticket && !isCreating) {
@@ -112,8 +138,6 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, current
   };
 
   const handleArchive = () => {
-      // 1. Update status to resolved
-      // 2. Add system message to timeline
       const newEvent: TicketEvent = {
           id: `evt-${Date.now()}`,
           ticketId: ticket!.id,
@@ -130,13 +154,19 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, current
   };
 
   const handleSendComment = () => {
-      if (!commInput.trim() && pendingAttachments.length === 0) return;
+      if (!editorRef.current) return;
+      const content = editorRef.current.innerText.trim();
       
+      if (!content && pendingAttachments.length === 0) return;
+      
+      // Note: We are sending innerText which strips the HTML tags of chips but keeps the text.
+      // Ideally, you'd process this to keep the mentions structured (e.g. @[id:name]), 
+      // but for this demo, we'll just send the text representation.
       const newEvent: TicketEvent = {
           id: `evt-${Date.now()}`,
           ticketId: ticket!.id,
           sender: currentUser,
-          content: commInput,
+          content: content,
           type: commTab === 'internal' ? 'internal_note' : 'public_reply',
           attachments: pendingAttachments,
           createdAt: new Date()
@@ -145,12 +175,128 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, current
       onSave({
           timeline: [...(ticket!.timeline || []), newEvent]
       });
-      setCommInput('');
+      editorRef.current.innerHTML = ''; // Clear editor
       setPendingAttachments([]);
+      setMentionQuery(null);
+  };
+
+  // --- Mention Logic (ContentEditable) ---
+  const filteredMentions = mentionQuery !== null
+    ? MENTION_CANDIDATES.filter(c => 
+        c.name.toLowerCase().includes(mentionQuery.toLowerCase()) || 
+        c.handle.toLowerCase().includes(mentionQuery.toLowerCase())
+      )
+    : [];
+
+  const handleEditorInput = () => {
+      if (!editorRef.current) return;
+      
+      // Only detect mentions in internal note mode
+      if (commTab !== 'internal') return;
+
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+
+      const range = selection.getRangeAt(0);
+      const textNode = range.startContainer;
+      
+      // Ensure we are inside a text node
+      if (textNode.nodeType !== Node.TEXT_NODE) {
+          setMentionQuery(null);
+          return;
+      }
+
+      const text = textNode.textContent || '';
+      const cursorOffset = range.startOffset;
+
+      // Backward search for @
+      let atIndex = -1;
+      for (let i = cursorOffset - 1; i >= 0; i--) {
+          if (text[i] === '@') {
+              atIndex = i;
+              break;
+          }
+          // Stop if whitespace encountered (simple heuristic to prevent long-distance lookup)
+          if (/\s/.test(text[i])) break;
+      }
+
+      if (atIndex !== -1) {
+          const query = text.substring(atIndex + 1, cursorOffset);
+          setMentionQuery(query);
+          setActiveMentionIndex(0);
+          mentionRangeRef.current = range.cloneRange();
+          mentionRangeRef.current.setStart(textNode, atIndex);
+          mentionRangeRef.current.setEnd(textNode, cursorOffset);
+      } else {
+          setMentionQuery(null);
+          mentionRangeRef.current = null;
+      }
+  };
+
+  const insertMentionCapsule = (candidate: typeof MENTION_CANDIDATES[0]) => {
+      if (!mentionRangeRef.current) return;
+
+      const range = mentionRangeRef.current;
+      range.deleteContents();
+
+      // Create Capsule Span
+      const span = document.createElement('span');
+      span.contentEditable = 'false';
+      span.className = 'inline-block bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 mx-0.5 text-xs font-bold border border-blue-200 select-none align-middle';
+      span.textContent = `@${candidate.name}`;
+      
+      // Insert Span
+      range.insertNode(span);
+
+      // Insert Space after
+      const space = document.createTextNode('\u00A0');
+      range.collapse(false); // Move to end of inserted span
+      range.insertNode(space);
+      
+      // Move cursor after space
+      const selection = window.getSelection();
+      if (selection) {
+          range.setStartAfter(space);
+          range.setEndAfter(space);
+          selection.removeAllRanges();
+          selection.addRange(range);
+      }
+
+      // Reset
+      setMentionQuery(null);
+      mentionRangeRef.current = null;
+      if (editorRef.current) editorRef.current.focus();
+  };
+
+  const handleEditorKeyDown = (e: React.KeyboardEvent) => {
+      const isMenuOpen = mentionQuery !== null && filteredMentions.length > 0;
+
+      if (isMenuOpen) {
+          if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              setActiveMentionIndex(prev => (prev + 1) % filteredMentions.length);
+              return;
+          } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              setActiveMentionIndex(prev => (prev - 1 + filteredMentions.length) % filteredMentions.length);
+              return;
+          } else if (e.key === 'Enter' || e.key === 'Tab') {
+              e.preventDefault();
+              insertMentionCapsule(filteredMentions[activeMentionIndex]);
+              return;
+          } else if (e.key === 'Escape') {
+              setMentionQuery(null);
+              return;
+          }
+      }
+
+      if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          handleSendComment();
+      }
   };
 
   const handleUploadRpa = () => {
-      // Simulate uploading a file
       const mockDsl = JSON.stringify({
         flowName: "Inserted_Snippet_v2",
         steps: [
@@ -159,12 +305,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, current
           { action: "Input.Click", target: "#login-btn" }
         ]
       });
-      
-      const newAttachment = {
-          name: "login_flow_v2.rpa",
-          type: 'rpa_dsl',
-          content: mockDsl
-      };
+      const newAttachment = { name: "login_flow_v2.rpa", type: 'rpa_dsl', content: mockDsl };
       setPendingAttachments([...pendingAttachments, newAttachment]);
   };
 
@@ -237,6 +378,15 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, current
                     <div className="flex items-center gap-2">
                         <UserIcon size={16} />
                         <span>{ticket.customer.name} ({ticket.customer.company})</span>
+                        {ticket.customer.phone && (
+                            <button 
+                                onClick={() => onOutboundCall && onOutboundCall(ticket.customer.phone, ticket.customer)}
+                                className="ml-1 p-1 bg-green-50 text-green-600 rounded-full hover:bg-green-100 transition-colors"
+                                title={`Call ${ticket.customer.phone}`}
+                            >
+                                <Phone size={12} className="fill-current"/>
+                            </button>
+                        )}
                     </div>
                     <div className="w-px h-3 bg-slate-300"></div>
                     <div className="flex items-center gap-2">
@@ -262,8 +412,8 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, current
                     {/* Main Column: Description & Communication */}
                     <div className="col-span-8 flex flex-col gap-6">
                         
-                        {/* 1. Description Section (Rich Content) */}
-                        <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm">
+                        {/* 1. Description Section (Rich Content) with Auto-Collapse */}
+                        <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm relative transition-all duration-300">
                             <h3 className="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wide flex items-center justify-between">
                                 {t('lbl_desc')}
                                 <div className="flex gap-2">
@@ -271,13 +421,36 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, current
                                     <Video size={14} className="text-slate-400"/>
                                 </div>
                             </h3>
-                            <div className="text-slate-700 leading-relaxed whitespace-pre-wrap font-sans text-sm">
-                                {ticket.description}
+                            
+                            {/* Collapsible Container */}
+                            <div className={`transition-all duration-500 ease-in-out relative ${!isDescExpanded ? 'max-h-24 overflow-hidden' : ''}`}>
+                                <div className="text-slate-700 leading-relaxed whitespace-pre-wrap font-sans text-sm">
+                                    {ticket.description}
+                                </div>
+                                {/* Render RPA DSL if present in description */}
+                                {ticket.descriptionRpaDsl && (
+                                    <RPASnippetViewer dslString={ticket.descriptionRpaDsl} />
+                                )}
+
+                                {/* Gradient Fade for collapsed state */}
+                                {!isDescExpanded && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent pointer-events-none"></div>
+                                )}
                             </div>
-                            {/* Render RPA DSL if present in description */}
-                            {ticket.descriptionRpaDsl && (
-                                <RPASnippetViewer dslString={ticket.descriptionRpaDsl} />
-                            )}
+
+                            {/* Toggle Button */}
+                            <div className="flex justify-center mt-2">
+                                <button 
+                                    onClick={() => setIsDescExpanded(!isDescExpanded)}
+                                    className="text-xs flex items-center gap-1 text-slate-400 hover:text-blue-600 transition-colors py-1 px-3 rounded-full hover:bg-slate-50"
+                                >
+                                    {isDescExpanded ? (
+                                        <><ChevronUp size={12} /> Show Less</>
+                                    ) : (
+                                        <><ChevronDown size={12} /> Show Full Description</>
+                                    )}
+                                </button>
+                            </div>
                         </div>
 
                         {/* 2. Communication Area */}
@@ -370,8 +543,50 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, current
                                 )}
                             </div>
 
-                            {/* Input Area */}
-                            <div className="p-4 bg-white border-t border-slate-200">
+                            {/* Input Area with Mentions */}
+                            <div className="p-4 bg-white border-t border-slate-200 relative">
+                                
+                                {/* Mention Popover */}
+                                {mentionQuery !== null && filteredMentions.length > 0 && (
+                                    <div className="absolute bottom-full left-4 mb-2 w-72 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden z-20 animate-in slide-in-from-bottom-2 duration-150">
+                                        <div className="bg-slate-50 px-3 py-1.5 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                            {t('mention_label')}
+                                        </div>
+                                        <div className="max-h-48 overflow-y-auto">
+                                            {filteredMentions.map((item, idx) => (
+                                                <div 
+                                                    key={item.id}
+                                                    onClick={() => insertMentionCapsule(item)}
+                                                    className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors ${
+                                                        idx === activeMentionIndex ? 'bg-blue-50' : 'hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    {item.type === 'user' ? (
+                                                        <img src={item.avatar} className="w-8 h-8 rounded-full border border-slate-200" alt=""/>
+                                                    ) : (
+                                                        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 border border-purple-200">
+                                                            <Users size={14} />
+                                                        </div>
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-bold text-slate-800 truncate">{item.name}</span>
+                                                            {item.type === 'group' && (
+                                                                <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 rounded font-bold">ALIAS</span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs text-slate-500 truncate flex items-center gap-1">
+                                                            {item.type === 'user' ? <Briefcase size={10}/> : <Zap size={10}/>}
+                                                            {item.desc}
+                                                        </div>
+                                                    </div>
+                                                    {idx === activeMentionIndex && <div className="text-xs text-blue-500 font-medium">↵</div>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {pendingAttachments.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mb-2 p-2 bg-slate-50 border border-slate-100 rounded">
                                         {pendingAttachments.map((att, i) => (
@@ -400,22 +615,28 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, isCreating, current
                                          </button>
                                          <button className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100" title="Insert Emoji"><Smile size={16}/></button>
                                     </div>
-                                    <textarea 
-                                        value={commInput}
-                                        onChange={(e) => setCommInput(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if(e.key === 'Enter' && !e.shiftKey) {
-                                                e.preventDefault();
-                                                handleSendComment();
-                                            }
-                                        }}
-                                        className="w-full bg-transparent border-none focus:ring-0 outline-none resize-none text-sm min-h-[60px]"
-                                        placeholder={commTab === 'internal' ? t('comm_placeholder_internal') : t('comm_placeholder_customer')}
+                                    
+                                    {/* Replaced Textarea with ContentEditable Div for Chip Support */}
+                                    <div
+                                        ref={editorRef}
+                                        contentEditable
+                                        onInput={handleEditorInput}
+                                        onKeyDown={handleEditorKeyDown}
+                                        className="w-full bg-transparent border-none focus:ring-0 outline-none overflow-y-auto text-sm min-h-[60px] max-h-48 whitespace-pre-wrap"
+                                        style={{ fontFamily: 'inherit' }}
+                                        data-placeholder={commTab === 'internal' ? t('comm_placeholder_internal') : t('comm_placeholder_customer')}
                                     />
+                                    <style>{`
+                                        [contentEditable]:empty:before {
+                                            content: attr(data-placeholder);
+                                            color: #94a3b8;
+                                            cursor: text;
+                                        }
+                                    `}</style>
+
                                     <div className="flex justify-end mt-1">
                                         <button 
                                             onClick={handleSendComment}
-                                            disabled={!commInput.trim() && pendingAttachments.length === 0}
                                             className={`px-4 py-1.5 rounded text-xs font-bold text-white flex items-center gap-1.5 transition-colors ${
                                                 commTab === 'internal' 
                                                     ? 'bg-yellow-600 hover:bg-yellow-700 disabled:bg-yellow-400' 

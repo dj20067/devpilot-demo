@@ -57,9 +57,9 @@ export const TransferModal: React.FC<{ onClose: () => void; onSubmit: (agent: st
         <BaseModal title={t('modal_transfer_title')} onClose={onClose} onSubmit={() => onSubmit(selectRef.current?.value || '')}>
             <label className="block text-xs text-slate-500 mb-1">{t('modal_transfer_select')}</label>
             <select ref={selectRef} className="w-full p-2 border border-slate-200 rounded text-sm outline-none bg-white">
-                <option value="Agent A">Sarah Smith (RPA Expert)</option>
-                <option value="Agent B">Mike Johnson (Cloud Team)</option>
-                <option value="Agent C">Tier 2 Support Queue</option>
+                <option value="Lin Xiao">林晓 (RPA 专家)</option>
+                <option value="Wang Qiang">王强 (云架构团队)</option>
+                <option value="Queue: Tier 2">队列: L2 技术支持</option>
             </select>
         </BaseModal>
     );

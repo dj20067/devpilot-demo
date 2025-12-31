@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 type Language = 'zh' | 'en';
@@ -64,6 +63,9 @@ const translations: Record<Language, Record<string, string>> = {
     send_btn: "发送",
     type_placeholder: "在此输入消息... (Shift+Enter 换行)",
     download: "下载文件",
+    consultation_card_title: "询前表单",
+    lbl_phone_provided: "用户预留电话",
+    lbl_no_phone_provided: "未提供电话号码",
     
     // Actions
     action_note: "服务小记",
@@ -121,7 +123,7 @@ const translations: Record<Language, Record<string, string>> = {
     tab_history: "历史",
     tab_more: "更多",
     
-    no_active_session: "无活动会话",
+    no_active_session: "No active session",
     
     // Session Info
     sect_form: "咨询工单详情",
@@ -162,6 +164,7 @@ const translations: Record<Language, Record<string, string>> = {
     lbl_tags: "标签",
     lbl_new_ticket: "新建工单",
     lbl_edit_ticket: "编辑工单",
+    lbl_subject: "主题",
     ticket_status_all: "全部状态",
     ticket_status_open: "待处理",
     ticket_status_in_progress: "处理中",
@@ -170,8 +173,20 @@ const translations: Record<Language, Record<string, string>> = {
     priority_all: "全部优先级",
     priority_low: "低",
     priority_medium: "中",
-    priority_high: "高",
-    priority_critical: "紧急",
+    priority_high: "High",
+    priority_critical: "Critical",
+
+    // Ticket Communication & RPA
+    rpa_snippet: "RPA 流程片段",
+    system_msg_archive: "系统归档了此工单。",
+    tab_comm_internal: "内部备注",
+    tab_comm_customer: "回复客户",
+    comm_internal_banner: "仅内部员工可见。客户不会收到通知。",
+    comm_customer_banner: "消息将发送给客户（客户可见）。",
+    comm_placeholder_internal: "输入内部备注 (@提及同事)...",
+    comm_placeholder_customer: "输入回复内容...",
+    btn_insert_rpa: "插入 RPA 片段",
+    mention_label: "提及列表",
     
     // Ticket Filters
     filter_label_status: "状态",
@@ -207,7 +222,6 @@ const translations: Record<Language, Record<string, string>> = {
     // Modal
     modal_title: "服务详情",
     lbl_id: "编号",
-    lbl_subject: "主题",
     lbl_date: "日期",
     lbl_type: "类型",
     lbl_resolution: "解决方案",
@@ -272,6 +286,9 @@ const translations: Record<Language, Record<string, string>> = {
     send_btn: "Send",
     type_placeholder: "Type your message here... (Shift+Enter for new line)",
     download: "Download File",
+    consultation_card_title: "Pre-Consultation Form",
+    lbl_phone_provided: "Provided Phone",
+    lbl_no_phone_provided: "No phone provided",
     
     // Actions
     action_note: "Service Note",
@@ -370,6 +387,7 @@ const translations: Record<Language, Record<string, string>> = {
     lbl_tags: "Tags",
     lbl_new_ticket: "New Ticket",
     lbl_edit_ticket: "Edit Ticket",
+    lbl_subject: "Subject",
     ticket_status_all: "All Status",
     ticket_status_open: "Open",
     ticket_status_in_progress: "In Progress",
@@ -380,6 +398,18 @@ const translations: Record<Language, Record<string, string>> = {
     priority_medium: "Medium",
     priority_high: "High",
     priority_critical: "Critical",
+
+    // Ticket Communication & RPA
+    rpa_snippet: "RPA Process Snippet",
+    system_msg_archive: "System archived this ticket.",
+    tab_comm_internal: "Internal Note",
+    tab_comm_customer: "Public Reply",
+    comm_internal_banner: "Visible to staff only. Customer will not be notified.",
+    comm_customer_banner: "Message will be sent to customer (Visible to customer).",
+    comm_placeholder_internal: "Type internal note (@mention colleagues)...",
+    comm_placeholder_customer: "Type your reply...",
+    btn_insert_rpa: "Insert RPA Snippet",
+    mention_label: "Mention List",
 
     // Ticket Filters
     filter_label_status: "Status",
@@ -415,7 +445,6 @@ const translations: Record<Language, Record<string, string>> = {
     // Modal
     modal_title: "Service Detail",
     lbl_id: "ID",
-    lbl_subject: "Subject",
     lbl_date: "Date",
     lbl_type: "Type",
     lbl_resolution: "Resolution",

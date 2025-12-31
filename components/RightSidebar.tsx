@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Session, UserRole, User, ServiceRecord } from '../types';
-import { Info, User as UserIcon, History, ShieldAlert, ExternalLink, Calendar, MapPin, Briefcase } from 'lucide-react';
+import { Session, UserRole, User, ServiceRecord, Customer } from '../types';
+import { Info, User as UserIcon, History, ShieldAlert, ExternalLink, Calendar, MapPin, Briefcase, Phone } from 'lucide-react';
 import ServiceHistoryModal from './ServiceHistoryModal';
 import { useI18n } from '../i18n';
 
@@ -8,11 +8,12 @@ interface RightSidebarProps {
   session: Session | undefined;
   currentUser: User;
   history: ServiceRecord[];
+  onOutboundCall?: (number: string, customer?: Customer) => void;
 }
 
 type TabType = 'session' | 'customer' | 'history' | 'more';
 
-const RightSidebar: React.FC<RightSidebarProps> = ({ session, currentUser, history }) => {
+const RightSidebar: React.FC<RightSidebarProps> = ({ session, currentUser, history, onOutboundCall }) => {
   const [activeTab, setActiveTab] = useState<TabType>('session');
   const [selectedRecord, setSelectedRecord] = useState<ServiceRecord | null>(null);
   const { t } = useI18n();
@@ -89,7 +90,11 @@ const RightSidebar: React.FC<RightSidebarProps> = ({ session, currentUser, histo
         <InfoRow label={t('lbl_tenant')} value={customer.tenantType} />
         <InfoRow label={t('lbl_account')} value={customer.accountType} />
         <InfoRow label={t('lbl_tier')} value={customer.tier} badge />
-        <InfoRow label={t('lbl_contact')} value={customer.phone} />
+        <InfoRow 
+            label={t('lbl_contact')} 
+            value={customer.phone} 
+            action={onOutboundCall && customer.phone ? () => onOutboundCall(customer.phone, customer) : undefined}
+        />
         <InfoRow label={t('lbl_email')} value={customer.email} />
       </div>
     </div>
@@ -234,14 +239,25 @@ const RightSidebar: React.FC<RightSidebarProps> = ({ session, currentUser, histo
   );
 };
 
-const InfoRow = ({ label, value, badge = false }: { label: string, value: string | undefined, badge?: boolean }) => (
+const InfoRow = ({ label, value, badge = false, action }: { label: string, value: string | undefined, badge?: boolean, action?: () => void }) => (
     <div className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">
         <span className="text-xs text-slate-500">{label}</span>
-        {badge ? (
-            <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs font-medium">{value}</span>
-        ) : (
-            <span className="text-sm text-slate-800 font-medium truncate max-w-[150px]">{value || '-'}</span>
-        )}
+        <div className="flex items-center gap-2">
+            {badge ? (
+                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs font-medium">{value}</span>
+            ) : (
+                <span className="text-sm text-slate-800 font-medium truncate max-w-[150px]">{value || '-'}</span>
+            )}
+            {action && (
+                <button 
+                    onClick={action} 
+                    className="p-1 text-green-600 hover:bg-green-50 rounded-full transition-colors"
+                    title="Call"
+                >
+                    <Phone size={14} className="fill-current" />
+                </button>
+            )}
+        </div>
     </div>
 );
 

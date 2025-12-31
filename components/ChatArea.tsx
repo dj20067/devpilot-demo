@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Session, Message, User } from '../types';
-import { Send, Paperclip, Smile, Reply, Trash2, X, MoreHorizontal, FileText, ArrowRightLeft, Ticket, Power, Clock, CheckCircle, AlertCircle, ArrowLeft, Info } from 'lucide-react';
+import { Session, Message, User, ConsultationForm } from '../types';
+import { Send, Paperclip, Smile, Reply, Trash2, X, MoreHorizontal, FileText, ArrowRightLeft, Ticket, Power, Clock, CheckCircle, AlertCircle, ArrowLeft, Info, Image as ImageIcon, Phone, ClipboardList } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { NoteModal, TransferModal, TicketModal } from './ActionModals';
 
@@ -15,9 +15,10 @@ interface ChatAreaProps {
   // Mobile handlers
   onBack?: () => void;
   onToggleContext?: () => void;
+  onOutboundCall?: (number: string) => void;
 }
 
-const ChatArea: React.FC<ChatAreaProps> = ({ session, messages, currentUser, onSendMessage, onDeleteMessage, onUpdateMessage, onBack, onToggleContext }) => {
+const ChatArea: React.FC<ChatAreaProps> = ({ session, messages, currentUser, onSendMessage, onDeleteMessage, onUpdateMessage, onBack, onToggleContext, onOutboundCall }) => {
   const [inputText, setInputText] = useState('');
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   
@@ -77,6 +78,63 @@ const ChatArea: React.FC<ChatAreaProps> = ({ session, messages, currentUser, onS
       e.target.value = '';
       setReplyTo(null);
     }
+  };
+
+  const isImageFile = (fileName?: string) => {
+    return /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName || '');
+  };
+
+  // Helper to render message content with phone numbers processing
+  const renderMessageWithContentProcessing = (content: string, isMe: boolean) => {
+      // 1. Split by Code Blocks (triple backticks)
+      const blocks = content.split(/(```[\s\S]*?```)/g);
+    
+      return blocks.map((block, blockIndex) => {
+          if (block.startsWith('```') && block.endsWith('```')) {
+              const code = block.slice(3, -3).replace(/^\n/, '');
+              return (
+                  <div key={blockIndex} className="my-2 rounded-lg overflow-hidden border border-slate-700 shadow-sm relative bg-slate-800">
+                     <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-900/50 border-b border-slate-700">
+                        <div className="w-2.5 h-2.5 rounded-full bg-red-500/80"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-green-500/80"></div>
+                     </div>
+                     <div className="p-3 overflow-x-auto">
+                          <code className="text-xs font-mono text-slate-200 whitespace-pre">{code}</code>
+                     </div>
+                  </div>
+              );
+          }
+        
+          // Process text blocks line by line (to handle Lists and Newlines)
+          return (
+              <div key={blockIndex} className="whitespace-pre-wrap"> 
+                  {block.split('\n').map((line, lineIndex) => {
+                      // Check for List Item (e.g. "- item" or "* item")
+                      const listMatch = line.match(/^(\s*)([-*])\s+(.+)$/);
+                      if (listMatch) {
+                         return (
+                             <div key={lineIndex} className="flex items-start gap-2 pl-2 my-0.5">
+                                 <span className="opacity-60 mt-1.5 w-1.5 h-1.5 rounded-full bg-current shrink-0"></span>
+                                 <span className="flex-1 min-w-0">{formatInline(listMatch[3], isMe, onOutboundCall)}</span>
+                             </div>
+                         );
+                      }
+                      
+                      // Normal text line
+                      if (line === '') {
+                          return <div key={lineIndex} className="h-[1em]"></div>;
+                      }
+
+                      return (
+                          <div key={lineIndex}>
+                              {formatInline(line, isMe, onOutboundCall)}
+                          </div>
+                      );
+                  })}
+              </div>
+          );
+      });
   };
 
   if (!session) {
@@ -164,6 +222,17 @@ const ChatArea: React.FC<ChatAreaProps> = ({ session, messages, currentUser, onS
                 );
             }
 
+            // Render Consultation Form Card
+            if (msg.type === 'consultation_card') {
+                return (
+                    <ConsultationCard 
+                        key={msg.id}
+                        form={msg.consultationData || session.consultationForm}
+                        onCall={onOutboundCall}
+                    />
+                );
+            }
+
             if (msg.isDeleted) {
                 return (
                     <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
@@ -197,25 +266,41 @@ const ChatArea: React.FC<ChatAreaProps> = ({ session, messages, currentUser, onS
                             }
                         `}>
                             {msg.type === 'file' ? (
-                                <div className="flex items-center gap-3 min-w-[200px]">
-                                    <div className={`p-2 rounded ${isMe ? 'bg-white/20' : 'bg-slate-100'}`}>
-                                        <FileText size={24} className={isMe ? 'text-white' : 'text-slate-500'} />
-                                    </div>
-                                    <div className="flex flex-col overflow-hidden">
-                                        <span className="font-medium underline cursor-pointer truncate max-w-[160px]" title={msg.fileName}>{msg.fileName}</span>
-                                        <a 
-                                            href={msg.fileUrl} 
-                                            target="_blank" 
-                                            rel="noreferrer"
-                                            className={`text-xs mt-0.5 hover:underline ${isMe ? 'text-blue-100' : 'text-blue-500'}`}
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            {t('download')}
-                                        </a> 
+                                <div className="flex flex-col gap-2">
+                                    {isImageFile(msg.fileName) && (
+                                        <div className="mt-1 rounded-lg overflow-hidden border border-black/10 bg-black/5 max-w-[240px]">
+                                            <img 
+                                                src={msg.fileUrl} 
+                                                alt={msg.fileName} 
+                                                className="w-full h-auto max-h-[200px] object-contain"
+                                                loading="lazy"
+                                            />
+                                        </div>
+                                    )}
+                                    <div className="flex items-center gap-3 min-w-[200px]">
+                                        <div className={`p-2 rounded ${isMe ? 'bg-white/20' : 'bg-slate-100'}`}>
+                                            {isImageFile(msg.fileName) ? (
+                                                <ImageIcon size={24} className={isMe ? 'text-white' : 'text-slate-500'} />
+                                            ) : (
+                                                <FileText size={24} className={isMe ? 'text-white' : 'text-slate-500'} />
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col overflow-hidden">
+                                            <span className="font-medium underline cursor-pointer truncate max-w-[160px]" title={msg.fileName}>{msg.fileName}</span>
+                                            <a 
+                                                href={msg.fileUrl} 
+                                                target="_blank" 
+                                                rel="noreferrer"
+                                                className={`text-xs mt-0.5 hover:underline ${isMe ? 'text-blue-100' : 'text-blue-500'}`}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                {t('download')}
+                                            </a> 
+                                        </div>
                                     </div>
                                 </div>
                             ) : (
-                                renderMessageContent(msg.content, isMe)
+                                renderMessageWithContentProcessing(msg.content, isMe)
                             )}
                             
                             {/* Message Tools (Hover) */}
@@ -334,68 +419,45 @@ const ChatArea: React.FC<ChatAreaProps> = ({ session, messages, currentUser, onS
   );
 };
 
-// --- Helper Functions for Markdown Rendering ---
-// (Same as before)
-const renderMessageContent = (content: string, isMe: boolean) => {
-    // 1. Split by Code Blocks (triple backticks)
-    const blocks = content.split(/(```[\s\S]*?```)/g);
-    
-    return blocks.map((block, blockIndex) => {
-        if (block.startsWith('```') && block.endsWith('```')) {
-            const code = block.slice(3, -3).replace(/^\n/, '');
-            return (
-                <div key={blockIndex} className="my-2 rounded-lg overflow-hidden border border-slate-700 shadow-sm relative bg-slate-800">
-                   <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-900/50 border-b border-slate-700">
-                      <div className="w-2.5 h-2.5 rounded-full bg-red-500/80"></div>
-                      <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></div>
-                      <div className="w-2.5 h-2.5 rounded-full bg-green-500/80"></div>
-                   </div>
-                   <div className="p-3 overflow-x-auto">
-                        <code className="text-xs font-mono text-slate-200 whitespace-pre">{code}</code>
-                   </div>
-                </div>
-            );
-        }
-        
-        // Process text blocks line by line (to handle Lists and Newlines)
-        return (
-            <div key={blockIndex} className="whitespace-pre-wrap"> 
-                {block.split('\n').map((line, lineIndex) => {
-                    // Check for List Item (e.g. "- item" or "* item")
-                    const listMatch = line.match(/^(\s*)([-*])\s+(.+)$/);
-                    if (listMatch) {
-                       return (
-                           <div key={lineIndex} className="flex items-start gap-2 pl-2 my-0.5">
-                               <span className="opacity-60 mt-1.5 w-1.5 h-1.5 rounded-full bg-current shrink-0"></span>
-                               <span className="flex-1 min-w-0">{formatInline(listMatch[3], isMe)}</span>
-                           </div>
-                       );
-                    }
-                    
-                    // Normal text line
-                    // If line is empty, render a break if it's not the last line
-                    if (line === '') {
-                        return <div key={lineIndex} className="h-[1em]"></div>;
-                    }
+// --- Helper Functions for Markdown & Phone Rendering ---
 
-                    return (
-                        <div key={lineIndex}>
-                            {formatInline(line, isMe)}
-                        </div>
-                    );
-                })}
-            </div>
-        );
+const formatInline = (text: string, isMe: boolean, onCall?: (n: string) => void) => {
+    // 0. Detect Phone Numbers first (Format: +86 138-0000-0001 or general 11 digit)
+    // Regex matches the specific mock format or general Chinese mobile
+    const phoneRegex = /(\+86\s\d{3}-\d{4}-\d{4})|(\d{3}-\d{4}-\d{4})/g;
+
+    const parts = text.split(phoneRegex);
+    
+    return parts.map((part, index) => {
+        if (!part) return null;
+
+        if (part.match(phoneRegex)) {
+            return (
+                <span key={`phone-${index}`} className="inline-flex items-center gap-1 align-baseline mx-1">
+                    <span className="underline decoration-slate-300">{part}</span>
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onCall && onCall(part); }}
+                        className={`p-0.5 rounded-full hover:bg-black/10 transition-colors ${isMe ? 'text-white' : 'text-green-600'}`}
+                        title={`Call ${part}`}
+                    >
+                        <Phone size={12} className="fill-current"/>
+                    </button>
+                </span>
+            )
+        }
+
+        // Standard formatting for non-phone parts
+        return formatTextStyles(part, isMe, index);
     });
 };
 
-const formatInline = (text: string, isMe: boolean) => {
+const formatTextStyles = (text: string, isMe: boolean, prefixKey: number) => {
     // 1. Split by Inline Code
     const parts = text.split(/(`[^`]+`)/g);
     return parts.map((part, index) => {
         if (part.startsWith('`') && part.endsWith('`')) {
             return (
-                <code key={index} className={`px-1.5 py-0.5 rounded text-xs font-mono mx-0.5 align-middle border ${
+                <code key={`${prefixKey}-${index}`} className={`px-1.5 py-0.5 rounded text-xs font-mono mx-0.5 align-middle border ${
                      isMe 
                      ? 'bg-blue-800 text-blue-50 border-blue-700' 
                      : 'bg-slate-100 text-pink-600 border-slate-200'
@@ -410,13 +472,13 @@ const formatInline = (text: string, isMe: boolean) => {
         const subParts = part.split(/(\*\*[^*]+\*\*)/g);
         return subParts.map((subPart, j) => {
             if (subPart.startsWith('**') && subPart.endsWith('**')) {
-                return <strong key={`${index}-${j}`} className="font-bold">{subPart.slice(2, -2)}</strong>;
+                return <strong key={`${prefixKey}-${index}-${j}`} className="font-bold">{subPart.slice(2, -2)}</strong>;
             }
             // Split by Italic (*text*)
             const subSubParts = subPart.split(/(\*[^*]+\*)/g);
              return subSubParts.map((s, k) => {
                  if (s.startsWith('*') && s.endsWith('*')) {
-                     return <em key={`${index}-${j}-${k}`} className="italic">{s.slice(1, -1)}</em>;
+                     return <em key={`${prefixKey}-${index}-${j}-${k}`} className="italic">{s.slice(1, -1)}</em>;
                  }
                  return s;
              });
@@ -440,6 +502,54 @@ const ActionButton: React.FC<{ icon: any, label: string, onClick: () => void, va
         <span className="hidden md:inline text-[10px] font-medium leading-none">{label}</span>
     </button>
 );
+
+const ConsultationCard: React.FC<{ form: ConsultationForm, onCall?: (n: string) => void }> = ({ form, onCall }) => {
+    const { t } = useI18n();
+    return (
+        <div className="flex justify-center my-6 w-full animate-in slide-in-from-top-4 fade-in">
+            <div className="w-full max-w-sm bg-slate-50 border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+                <div className="bg-slate-100 border-b border-slate-200 px-4 py-2 flex items-center gap-2">
+                    <ClipboardList size={16} className="text-slate-500"/>
+                    <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t('consultation_card_title')}</span>
+                </div>
+                <div className="p-4 space-y-3">
+                    <div>
+                         <div className="flex items-center gap-2 mb-1">
+                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">{form.productModule}</span>
+                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600 border border-slate-300">{form.environment}</span>
+                         </div>
+                         <p className="text-sm text-slate-800 leading-relaxed">
+                             {form.description}
+                         </p>
+                    </div>
+                    
+                    <div className="pt-3 border-t border-slate-200">
+                        {form.phone ? (
+                             <div className="flex justify-between items-center bg-white p-2 rounded border border-slate-200">
+                                 <div>
+                                     <span className="text-[10px] text-slate-400 block uppercase">{t('lbl_phone_provided')}</span>
+                                     <span className="text-sm font-mono font-medium text-slate-700">{form.phone}</span>
+                                 </div>
+                                 <button 
+                                    onClick={() => onCall && onCall(form.phone!)}
+                                    className="p-1.5 bg-green-50 text-green-600 rounded-full hover:bg-green-100 transition-colors border border-green-200"
+                                    title="Call now"
+                                 >
+                                     <Phone size={14} className="fill-current"/>
+                                 </button>
+                             </div>
+                        ) : (
+                            <div className="flex items-center gap-2 text-xs text-orange-600 bg-orange-50 p-2 rounded border border-orange-100">
+                                <AlertCircle size={14} />
+                                <span>{t('lbl_no_phone_provided')}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
 
 const EndConfirmationCard: React.FC<{ message: Message, onUpdate: (updates: Partial<Message>) => void }> = ({ message, onUpdate }) => {
     const { t } = useI18n();
