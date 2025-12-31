@@ -1,15 +1,42 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import SessionList from './components/SessionList';
 import ChatArea from './components/ChatArea';
 import RightSidebar from './components/RightSidebar';
 import NavRail from './components/NavRail';
 import TicketList from './components/TicketList';
 import TicketDetail from './components/TicketDetail';
-import TicketGrid from './components/TicketGrid'; // Import TicketGrid
+import TicketGrid from './components/TicketGrid'; 
+import OutboundCallPanel from './components/OutboundCallPanel';
 import { getMockData } from './constants';
 import { UserRole, Message, Ticket, User } from './types';
-import { Settings, Bell, LayoutGrid, Globe, X, MessageSquare, Shield, Archive } from 'lucide-react';
+import { Settings, Bell, Globe, X, Archive, Phone, Mic, MicOff, ChevronDown, Check, Shield, AlertTriangle, Info } from 'lucide-react';
 import { I18nProvider, useI18n } from './i18n';
+import { ProfileModal } from './components/ProfileModal';
+
+// --- System Toast Component ---
+interface ToastProps {
+    message: string;
+    type: 'success' | 'error' | 'info';
+    onClose: () => void;
+}
+
+const SystemToast: React.FC<ToastProps> = ({ message, type, onClose }) => {
+    useEffect(() => {
+        const timer = setTimeout(onClose, 4000);
+        return () => clearTimeout(timer);
+    }, [onClose]);
+
+    const bgClass = type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-500' : 'bg-blue-600';
+    const Icon = type === 'success' ? Check : type === 'error' ? AlertTriangle : Info;
+
+    return (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 px-4 py-3 rounded-lg shadow-xl text-white ${bgClass} animate-in slide-in-from-top-2 fade-in duration-300`}>
+            <Icon size={18} />
+            <span className="text-sm font-medium">{message}</span>
+            <button onClick={onClose} className="ml-2 hover:bg-white/20 rounded p-0.5"><X size={14}/></button>
+        </div>
+    );
+};
 
 // Standalone Page Layout for heavy interactions
 const StandaloneTicketPage: React.FC<{ ticket: Ticket; currentUser: User; onSave: (d: Partial<Ticket>) => void; }> = ({ ticket, currentUser, onSave }) => {
@@ -84,7 +111,7 @@ const DevPilotApp: React.FC = () => {
   const [data, setData] = useState(getMockData(language));
   const { MOCK_SESSIONS, MOCK_MESSAGES, CURRENT_USER, MOCK_HISTORY, MOCK_TICKETS } = data;
 
-  // View State - 'tickets' split into 'my_tickets' and 'all_tickets'
+  // View State
   const [activeView, setActiveView] = useState<'chat' | 'my_tickets' | 'all_tickets'>('chat');
 
   // Chat State
@@ -92,49 +119,145 @@ const DevPilotApp: React.FC = () => {
   const [messages, setMessages] = useState(MOCK_MESSAGES);
   const [currentUser, setCurrentUser] = useState(CURRENT_USER);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  // Global Status State
+  const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
+  const [chatStatus, setChatStatus] = useState<'online' | 'away' | 'offline'>('online');
+  const [acceptTickets, setAcceptTickets] = useState(true);
+  
+  // Audio State
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  // UI State
+  const [showCallPanel, setShowCallPanel] = useState(false);
+  const [toast, setToast] = useState<{msg: string, type: 'success' | 'error' | 'info'} | null>(null);
 
   // Ticket State
   const [tickets, setTickets] = useState(MOCK_TICKETS);
   const [activeTicketId, setActiveTicketId] = useState<string | null>(MOCK_TICKETS[0].id);
   
-  // Drawer State for All Tickets View
+  // Drawer State
   const [isTicketDrawerOpen, setIsTicketDrawerOpen] = useState(false);
 
-  // Standalone Mode State
+  // Standalone Mode
   const [standaloneTicketId, setStandaloneTicketId] = useState<string | null>(null);
 
-  // Check URL params for standalone mode
+  // Audio System: Verify and Play Success Tone
+  const verifyAndEnableAudio = async (silentMode: boolean = false) => {
+    try {
+        if (!audioContextRef.current) {
+            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        }
+        
+        const ctx = audioContextRef.current;
+
+        // Try to resume context (Browser Autoplay Policy often keeps it suspended)
+        if (ctx.state === 'suspended') {
+            await ctx.resume();
+        }
+
+        if (ctx.state === 'running') {
+            setAudioEnabled(true);
+            
+            // Only play success tone if explicitly requested (not silent check)
+            if (!silentMode) {
+                // Create a pleasant "Success" chord (C5 + E5)
+                const now = ctx.currentTime;
+                
+                const osc1 = ctx.createOscillator();
+                osc1.type = 'sine';
+                osc1.frequency.value = 523.25; // C5
+
+                const osc2 = ctx.createOscillator();
+                osc2.type = 'sine';
+                osc2.frequency.value = 659.25; // E5
+
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc1.start(now);
+                osc2.start(now);
+                osc1.stop(now + 0.5);
+                osc2.stop(now + 0.5);
+
+                setToast({ msg: t('toast_audio_success'), type: 'success' });
+            }
+        } else {
+            // Still suspended or closed
+            throw new Error("Context suspended");
+        }
+    } catch (e) {
+        console.error("Audio Verification Failed", e);
+        setAudioEnabled(false);
+        if (!silentMode) {
+            setToast({ msg: t('toast_audio_failed'), type: 'error' });
+        }
+    }
+  };
+
+  // Passive Audio Check (On Interaction)
+  useEffect(() => {
+    const handlePassiveUnlock = () => {
+        if (!audioEnabled) {
+            // Attempt silent unlock on first click
+            verifyAndEnableAudio(true);
+        }
+    };
+    
+    window.addEventListener('click', handlePassiveUnlock, { once: true });
+    return () => window.removeEventListener('click', handlePassiveUnlock);
+  }, [audioEnabled]);
+
+  // Handle Explicit Audio Toggle
+  const handleAudioToggle = () => {
+      if (audioEnabled) {
+          // Allow muting/disabling visually
+          setAudioEnabled(false);
+          audioContextRef.current?.suspend();
+      } else {
+          // Explicitly verify with feedback
+          setToast({ msg: t('toast_audio_verifying'), type: 'info' });
+          verifyAndEnableAudio(false);
+      }
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tid = params.get('ticketId');
     if (tid) setStandaloneTicketId(tid);
   }, []);
 
-  // When language changes, refresh mock data (Simulating a re-fetch)
   useEffect(() => {
     const newData = getMockData(language);
     setData(newData);
-    // Important: Don't completely override messages if user added some, but for this mock we reset to show translation
     setMessages(newData.MOCK_MESSAGES); 
     setTickets(newData.MOCK_TICKETS);
-    // If standalone, ensure we try to find that ticket in new data
     const currentActive = standaloneTicketId || activeTicketId;
     if (currentActive && newData.MOCK_TICKETS.some(t => t.id === currentActive)) {
         // keep active
     } else {
         setActiveTicketId(newData.MOCK_TICKETS[0].id);
     }
-    
-    setCurrentUser(prev => ({...newData.CURRENT_USER, role: prev.role})); 
+    setCurrentUser(prev => ({...prev, role: newData.CURRENT_USER.role, name: prev.name === newData.CURRENT_USER.name ? newData.CURRENT_USER.name : prev.name })); 
   }, [language]);
 
   const activeSession = MOCK_SESSIONS.find(s => s.id === activeSessionId) || MOCK_SESSIONS[0];
   
-  // Ticket Logic
   const isCreatingTicket = activeTicketId === 'new';
   const activeTicket = isCreatingTicket ? undefined : tickets.find(t => t.id === activeTicketId);
 
-  // Filter Tickets based on View
+  // Determine current context customer for the dialer
+  const currentContextCustomer = activeView === 'chat' 
+      ? activeSession?.customer 
+      : (activeTicket ? activeTicket.customer : undefined);
+
   const getVisibleTickets = () => {
       if (activeView === 'all_tickets') {
           return tickets;
@@ -152,7 +275,6 @@ const DevPilotApp: React.FC = () => {
   const visibleTickets = getVisibleTickets();
   const ticketListTitle = activeView === 'my_tickets' ? t('nav_my_tickets') : t('nav_all_tickets');
 
-  // Handle Ticket Selection logic differently based on view
   const handleTicketSelect = (ticketId: string) => {
       setActiveTicketId(ticketId);
       if (activeView === 'all_tickets') {
@@ -195,16 +317,18 @@ const DevPilotApp: React.FC = () => {
       setIsSettingsOpen(false);
   }
 
+  const handleUpdateProfile = (updates: Partial<User>) => {
+      setCurrentUser(prev => ({ ...prev, ...updates }));
+  };
+
   const handleSaveTicket = (ticketData: Partial<Ticket>) => {
       if (isCreatingTicket) {
-          // Create new
           const newTicket: Ticket = {
               id: `TIC-${Math.floor(Math.random() * 10000)}`,
               subject: ticketData.subject || 'Untitled',
               description: ticketData.description || '',
               status: ticketData.status || 'open',
               priority: ticketData.priority || 'medium',
-              // Use mock customer for now
               customer: MOCK_SESSIONS[0].customer,
               assignee: ticketData.assignee,
               cc: [],
@@ -217,7 +341,6 @@ const DevPilotApp: React.FC = () => {
           setTickets([newTicket, ...tickets]);
           setActiveTicketId(newTicket.id);
       } else if (activeTicket || standaloneTicketId) {
-          // Update existing
           const targetId = activeTicket?.id || standaloneTicketId;
           setTickets(tickets.map(t => t.id === targetId ? { ...t, ...ticketData, updatedAt: new Date() } : t));
       }
@@ -225,6 +348,13 @@ const DevPilotApp: React.FC = () => {
 
   const openTicketInNewTab = (ticketId: string) => {
       window.open(`?ticketId=${ticketId}`, '_blank');
+  };
+
+  // Helper for status color
+  const getStatusColor = () => {
+      if (chatStatus === 'online') return 'bg-green-500';
+      if (chatStatus === 'away') return 'bg-orange-500';
+      return 'bg-slate-400';
   };
 
   // --- RENDER STANDALONE MODE ---
@@ -247,8 +377,13 @@ const DevPilotApp: React.FC = () => {
 
   // --- RENDER NORMAL APP ---
   return (
-    <div className="flex h-screen bg-white overflow-hidden" onClick={() => setIsSettingsOpen(false)}>
+    <div className="flex h-screen bg-white overflow-hidden" onClick={() => { setIsSettingsOpen(false); setIsStatusMenuOpen(false); }}>
       
+      {/* System Toast */}
+      {toast && (
+          <SystemToast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />
+      )}
+
       {/* 1. Left Navigation Rail */}
       <NavRail activeView={activeView} onChangeView={setActiveView} />
 
@@ -256,12 +391,90 @@ const DevPilotApp: React.FC = () => {
       <div className="flex-1 flex flex-col min-w-0">
         
         {/* Top Header */}
-        <div className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6 flex-shrink-0 z-20 shadow-sm">
+        <div className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6 flex-shrink-0 z-20 shadow-sm relative">
             <h1 className="text-lg font-bold text-slate-800">
                 {activeView === 'chat' ? t('nav_chat') : ticketListTitle}
             </h1>
             
             <div className="flex items-center gap-4">
+                
+                {/* Outbound Call Trigger */}
+                <button 
+                    onClick={() => setShowCallPanel(!showCallPanel)}
+                    className={`p-2 rounded-lg transition-colors border ${showCallPanel ? 'bg-green-100 text-green-700 border-green-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-slate-700'}`}
+                    title={t('btn_outbound_call')}
+                >
+                    <Phone size={16} className={showCallPanel ? 'fill-current' : ''} />
+                </button>
+
+                <div className="h-6 w-px bg-slate-200 mx-1"></div>
+
+                {/* Combined Status Menu */}
+                <div className="relative">
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setIsStatusMenuOpen(!isStatusMenuOpen); }}
+                        className="flex items-center gap-2 pl-2 pr-1 py-1.5 rounded-full border border-slate-200 hover:bg-slate-50 transition-colors bg-white shadow-sm"
+                    >
+                        <span className={`w-2.5 h-2.5 rounded-full ${getStatusColor()}`}></span>
+                        <span className="text-xs font-bold text-slate-700 min-w-[3rem] text-left">{t(`status_${chatStatus}` as any)}</span>
+                        <ChevronDown size={14} className="text-slate-400" />
+                    </button>
+
+                    {isStatusMenuOpen && (
+                        <div 
+                            className="absolute top-10 right-0 w-48 bg-white rounded-lg shadow-xl border border-slate-100 py-1 z-50 animate-in fade-in zoom-in-95 duration-100"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chat Status</div>
+                            {['online', 'away', 'offline'].map((s) => (
+                                <button
+                                    key={s}
+                                    onClick={() => { setChatStatus(s as any); setIsStatusMenuOpen(false); }}
+                                    className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
+                                >
+                                    <span className={`w-2 h-2 rounded-full ${
+                                        s === 'online' ? 'bg-green-500' : s === 'away' ? 'bg-orange-500' : 'bg-slate-400'
+                                    }`}></span>
+                                    <span className={`${chatStatus === s ? 'font-bold text-slate-800' : 'text-slate-600'}`}>{t(`status_${s}` as any)}</span>
+                                    {chatStatus === s && <Check size={14} className="ml-auto text-blue-600" />}
+                                </button>
+                            ))}
+                            
+                            <div className="h-px bg-slate-100 my-1"></div>
+                            
+                            <div className="px-3 py-2 flex items-center justify-between">
+                                <span className="text-sm text-slate-700">{t('lbl_accept_tickets')}</span>
+                                <button 
+                                    onClick={() => setAcceptTickets(!acceptTickets)}
+                                    className={`w-9 h-5 rounded-full relative transition-colors ${acceptTickets ? 'bg-green-500' : 'bg-slate-300'}`}
+                                >
+                                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${acceptTickets ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Audio Status (Click to Verify) */}
+                <div 
+                    onClick={handleAudioToggle}
+                    className={`flex items-center justify-center w-8 h-8 rounded-full cursor-pointer transition-colors ${audioEnabled ? 'hover:bg-green-50' : 'hover:bg-red-50'}`}
+                    title={audioEnabled ? t('lbl_audio_enabled') : t('lbl_audio_disabled')}
+                >
+                    {audioEnabled ? (
+                        <Mic size={18} className="text-green-600" />
+                    ) : (
+                        <div className="relative">
+                            <MicOff size={18} className="text-red-400" />
+                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Role Switcher (Demo) */}
                 <button 
                     onClick={(e) => { e.stopPropagation(); toggleRole(); }} 
                     className="text-xs px-2 py-1 bg-slate-100 rounded border border-slate-200 hover:bg-slate-200 transition-colors"
@@ -269,7 +482,9 @@ const DevPilotApp: React.FC = () => {
                 >
                     {t('role_label')}: <span className={`${currentUser.role === UserRole.ADMIN ? 'text-blue-600' : 'text-green-600'} font-bold`}>{t(`role_${currentUser.role}` as any)}</span>
                 </button>
+                
                 <div className="h-4 w-px bg-slate-200"></div>
+                
                 <button className="relative">
                     <Bell size={18} className="text-slate-400 hover:text-slate-600 cursor-pointer" />
                     <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -296,8 +511,11 @@ const DevPilotApp: React.FC = () => {
                     )}
                 </div>
 
-                <div className="flex items-center gap-2 cursor-pointer group pl-2">
-                    <img src={currentUser.avatar} alt="Me" className="w-8 h-8 rounded-full border border-slate-200" />
+                <div 
+                    className="flex items-center gap-2 cursor-pointer group pl-2"
+                    onClick={() => setIsProfileModalOpen(true)}
+                >
+                    <img src={currentUser.avatar} alt="Me" className="w-8 h-8 rounded-full border border-slate-200 object-cover" />
                     <span className="text-xs font-medium text-slate-700 group-hover:text-blue-600 transition-colors">{currentUser.name}</span>
                 </div>
             </div>
@@ -385,7 +603,7 @@ const DevPilotApp: React.FC = () => {
                             isTicketDrawerOpen ? 'translate-x-0' : 'translate-x-full'
                         }`}
                     >
-                         {/* Drawer Close Button (Alternative to using TicketDetail's cancel/back) */}
+                         {/* Drawer Close Button */}
                          <button 
                             onClick={() => setIsTicketDrawerOpen(false)}
                             className="absolute top-4 right-4 z-[60] p-1.5 bg-white rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 border border-slate-200 shadow-sm"
@@ -393,11 +611,10 @@ const DevPilotApp: React.FC = () => {
                             <X size={18} />
                         </button>
 
-                         {/* Reuse TicketDetail inside drawer */}
                          <div className="h-full pt-10">
                             <TicketDetail 
                                 ticket={activeTicket}
-                                isCreating={false} // Drawer usually for viewing/editing existing
+                                isCreating={false} 
                                 currentUser={currentUser}
                                 onSave={handleSaveTicket}
                                 onCancel={() => setIsTicketDrawerOpen(false)}
@@ -409,6 +626,23 @@ const DevPilotApp: React.FC = () => {
             )}
 
         </div>
+
+        {/* Global Floating Panels */}
+        {showCallPanel && (
+            <OutboundCallPanel 
+                onClose={() => setShowCallPanel(false)} 
+                contextCustomer={currentContextCustomer}
+            />
+        )}
+
+        {/* Profile Modal */}
+        {isProfileModalOpen && (
+            <ProfileModal 
+                user={currentUser} 
+                onClose={() => setIsProfileModalOpen(false)} 
+                onSave={handleUpdateProfile}
+            />
+        )}
       </div>
     </div>
   );

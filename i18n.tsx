@@ -22,6 +22,34 @@ const translations: Record<Language, Record<string, string>> = {
     status_queued: "排队中",
     status_ended: "已结束",
     
+    // Global Status & Header
+    status_online: "在线",
+    status_away: "挂起",
+    status_offline: "离线",
+    lbl_accept_tickets: "接听工单",
+    lbl_audio_enabled: "音频已连接",
+    lbl_audio_disabled: "音频未连接 (点击重试)",
+    btn_outbound_call: "发起外呼",
+    call_panel_title: "外呼中心",
+    call_placeholder: "输入号码...",
+    btn_call: "呼叫",
+    btn_hangup: "挂断",
+    calling_status: "正在呼叫...",
+
+    // Audio Verification
+    toast_audio_verifying: "正在检测音频设备...",
+    toast_audio_success: "音频系统已就绪",
+    toast_audio_failed: "无法播放音频，请检查权限",
+    toast_audio_guide: "请点击麦克风图标以激活音频",
+    
+    // Call Association
+    call_associated_with: "关联至",
+    call_post_process: "后补关联",
+    call_post_desc: "本次通话未关联客户，请选择：",
+    btn_skip: "跳过",
+    btn_link: "关联",
+    recent_contacts: "最近/上下文",
+
     // Nav
     nav_chat: "在线会话",
     nav_my_tickets: "我的工单",
@@ -64,6 +92,18 @@ const translations: Record<Language, Record<string, string>> = {
     toast_ticket_created: "工单已创建",
     toast_ticket_saved: "工单已保存",
     toast_archived: "工单已归档，等待客户确认",
+
+    // Profile Modal
+    modal_profile_title: "编辑个人资料",
+    tab_profile_general: "基本信息",
+    tab_profile_integrations: "账号集成",
+    lbl_nickname: "昵称",
+    lbl_avatar: "头像链接",
+    integration_desc: "绑定第三方账号以同步工单状态和即时消息。",
+    btn_connect: "绑定",
+    btn_disconnect: "解绑",
+    status_connected: "已连接",
+    status_disconnected: "未连接",
 
     // End Session Card
     end_card_title: "工程师请求结束会话",
@@ -144,18 +184,6 @@ const translations: Record<Language, Record<string, string>> = {
     filter_date_updated: "更新时间",
     filter_reset: "重置筛选",
 
-    // Ticket Communication
-    tab_comm_internal: "内部协作",
-    tab_comm_customer: "客户沟通",
-    comm_placeholder_internal: "发送内部备注 (客户不可见)...",
-    comm_placeholder_customer: "回复客户 (Shift+Enter 换行)...",
-    comm_internal_banner: "内部协作区：消息仅对团队成员可见。",
-    comm_customer_banner: "客户沟通区：消息将实时发送给客户。",
-    rpa_snippet: "RPA 流程片段",
-    btn_insert_rpa: "插入 RPA 片段",
-    rpa_attachment_preview: "RPA 流程文件",
-    system_msg_archive: "系统：工程师标记该问题已解决，请确认解决方案。",
-
     // Ticket Grid Columns
     col_id: "工单号",
     col_subject: "主题",
@@ -202,6 +230,34 @@ const translations: Record<Language, Record<string, string>> = {
     status_queued: "Queued",
     status_ended: "Ended",
     
+    // Global Status & Header
+    status_online: "Online",
+    status_away: "Away",
+    status_offline: "Offline",
+    lbl_accept_tickets: "Accept Tickets",
+    lbl_audio_enabled: "Audio Online",
+    lbl_audio_disabled: "Audio Offline (Click to Retry)",
+    btn_outbound_call: "Outbound Call",
+    call_panel_title: "Dialer",
+    call_placeholder: "Enter number...",
+    btn_call: "Call",
+    btn_hangup: "Hangup",
+    calling_status: "Calling...",
+
+    // Audio Verification
+    toast_audio_verifying: "Verifying audio system...",
+    toast_audio_success: "Audio system ready",
+    toast_audio_failed: "Playback failed. Check permissions.",
+    toast_audio_guide: "Please click the microphone to enable audio.",
+
+    // Call Association
+    call_associated_with: "Linked to",
+    call_post_process: "Post-Call Association",
+    call_post_desc: "Call was unlinked. Select customer:",
+    btn_skip: "Skip",
+    btn_link: "Link",
+    recent_contacts: "Recent/Context",
+
     // Nav
     nav_chat: "Live Chat",
     nav_my_tickets: "My Tickets",
@@ -244,6 +300,18 @@ const translations: Record<Language, Record<string, string>> = {
     toast_ticket_created: "Ticket created",
     toast_ticket_saved: "Ticket saved",
     toast_archived: "Ticket archived, awaiting customer confirmation",
+
+    // Profile Modal
+    modal_profile_title: "Edit Profile",
+    tab_profile_general: "General",
+    tab_profile_integrations: "Integrations",
+    lbl_nickname: "Nickname",
+    lbl_avatar: "Avatar URL",
+    integration_desc: "Connect third-party accounts to sync ticket status and messages.",
+    btn_connect: "Connect",
+    btn_disconnect: "Disconnect",
+    status_connected: "Connected",
+    status_disconnected: "Disconnected",
 
     // End Session Card
     end_card_title: "Request to End Session",
@@ -324,18 +392,6 @@ const translations: Record<Language, Record<string, string>> = {
     filter_date_updated: "Updated Date",
     filter_reset: "Reset Filters",
 
-    // Ticket Communication
-    tab_comm_internal: "Internal Notes",
-    tab_comm_customer: "Customer Reply",
-    comm_placeholder_internal: "Add internal note (Hidden from customer)...",
-    comm_placeholder_customer: "Reply to customer (Shift+Enter for new line)...",
-    comm_internal_banner: "Internal Zone: Messages visible only to team members.",
-    comm_customer_banner: "Customer Zone: Messages are sent to customer in real-time.",
-    rpa_snippet: "RPA Process Snippet",
-    btn_insert_rpa: "Insert RPA Snippet",
-    rpa_attachment_preview: "RPA Process File",
-    system_msg_archive: "System: Engineer marked this issue as resolved. Please confirm the solution.",
-    
     // Ticket Grid Columns
     col_id: "ID",
     col_subject: "Subject",
@@ -344,7 +400,7 @@ const translations: Record<Language, Record<string, string>> = {
     col_status: "Status",
     col_assignee: "Assignee",
     col_updated: "Last Updated",
-
+    
     // More
     access_restricted: "Access Restricted",
     access_restricted_desc: "You do not have permission to view advanced customer data.",
